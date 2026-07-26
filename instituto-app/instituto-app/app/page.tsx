@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -26,35 +27,58 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF3E8] flex flex-col">
+    <div style={{ minHeight:'100vh', backgroundColor:'#FAF3E8', display:'flex', flexDirection:'column', colorScheme:'light' }}>
       <div className="tricolor-stripe" />
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full bg-[#3E5C76] text-[#FAF3E8] flex items-center justify-center text-2xl font-bold mx-auto mb-4">AFP</div>
-            <h1 className="text-2xl font-bold text-[#3E5C76]">Alliance Française</h1>
-            <p className="text-[#6B8294] mt-1 text-sm">Portoviejo — Sistema de gestión</p>
+      <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'1.5rem' }}>
+        <div style={{ width:'100%', maxWidth:'360px' }}>
+          <div style={{ textAlign:'center', marginBottom:'2rem' }}>
+            <Image
+              src="/logo-afp.png"
+              alt="Alliance Française Portoviejo"
+              width={120}
+              height={120}
+              style={{ objectFit:'contain', marginBottom:'12px' }}
+              priority
+            />
+            <h1 style={{ fontFamily:"'Playfair Display', Georgia, serif", fontSize:'24px', fontWeight:500, color:'#3E5C76', margin:0 }}>
+              Alliance Française
+            </h1>
+            <p style={{ fontFamily:"'Playfair Display', Georgia, serif", fontSize:'13px', color:'#BC4A3C', fontStyle:'italic', margin:'4px 0 0' }}>
+              Portoviejo — Système de gestion
+            </p>
           </div>
           <div className="card">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#3E5C76] mb-1.5">Correo electrónico</label>
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom:'14px' }}>
+                <label style={{ display:'block', fontSize:'12px', fontWeight:500, color:'#3E5C76', marginBottom:'5px', fontFamily:'Inter,sans-serif' }}>
+                  Correo electrónico
+                </label>
                 <input type="email" className="input" placeholder="tu@correo.com" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-[#3E5C76] mb-1.5">Contraseña</label>
+              <div style={{ marginBottom:'18px' }}>
+                <label style={{ display:'block', fontSize:'12px', fontWeight:500, color:'#3E5C76', marginBottom:'5px', fontFamily:'Inter,sans-serif' }}>
+                  Contraseña
+                </label>
                 <input type="password" className="input" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
-              {error && <p className="text-[#BC4A3C] text-sm bg-red-50 p-2 rounded-lg">{error}</p>}
-              <button type="submit" disabled={loading} className="btn-primary w-full justify-center flex items-center gap-2 py-3">
-                {loading ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+              {error && (
+                <p style={{ fontSize:'13px', color:'#BC4A3C', background:'#FEE2E2', padding:'8px 12px', borderRadius:'8px', marginBottom:'14px' }}>
+                  {error}
+                </p>
+              )}
+              <button type="submit" disabled={loading} className="btn-primary"
+                style={{ width:'100%', textAlign:'center', padding:'10px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
+                {loading && <span style={{ width:'14px', height:'14px', border:'2px solid #FAF3E8', borderTopColor:'transparent', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />}
                 {loading ? 'Entrando...' : 'Iniciar sesión'}
               </button>
             </form>
           </div>
-          <p className="text-center text-xs text-[#9CA8B3] mt-6">Sistema exclusivo del instituto · Acceso solo para personal autorizado</p>
+          <p style={{ textAlign:'center', fontSize:'11px', color:'#9CA8B3', marginTop:'1.5rem', fontFamily:'Inter,sans-serif' }}>
+            Sistema exclusivo del instituto · Acceso solo para personal autorizado
+          </p>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
