@@ -2,58 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Importar tipografía elegante ── */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
+body { background-color: #FAF3E8; color: #1a1a1a; font-family: Inter, system-ui, sans-serif; }
 
-/* ── Forzar siempre modo claro ── */
-:root, [data-theme="dark"], .dark {
-  color-scheme: light !important;
-  --azul:       #3E5C76;
-  --azul-light: #6B8294;
-  --azul-dark:  #2C4158;
-  --crema:      #FAF3E8;
-  --crema-dark: #F0E6D3;
-  --panel-bg:   #F5EDD8;
-  --terracota:  #BC4A3C;
-  --terra-light:#D4706A;
-  --borde:      #E8DFCF;
-  --borde-panel:#D9D0BF;
-}
+.tricolor-stripe { height: 4px; background: linear-gradient(to right, #3E5C76 33.33%, #FAF3E8 33.33%, #FAF3E8 66.66%, #BC4A3C 66.66%); border-bottom: 0.5px solid #E8DFCF; }
 
-html { color-scheme: light !important; }
-@media (prefers-color-scheme: dark) {
-  :root {
-    background-color: #FAF3E8 !important;
-    color: #1a1a1a !important;
-  }
-}
-
-body {
-  background-color: #FAF3E8;
-  color: #1a1a1a;
-  font-family: Inter, system-ui, sans-serif;
-}
-
-.tricolor-stripe {
-  height: 6px;
-  background: linear-gradient(to right, #3E5C76 33.33%, #F5EDD8 33.33%, #F5EDD8 66.66%, #BC4A3C 66.66%);
-  border-bottom: 1px solid #D9D0BF;
-}
-
-.font-serif { font-family: 'Playfair Display', Georgia, serif; }
-h1, h2 { font-family: 'Playfair Display', Georgia, serif; }
-
-.btn-primary { background:#3E5C76; color:#FAF3E8; padding:8px 16px; border-radius:8px; font-size:14px; font-weight:500; border:none; cursor:pointer; transition:background 0.15s; display:inline-block; text-decoration:none; font-family:Inter,sans-serif; }
+.btn-primary { background:#3E5C76; color:#FAF3E8; padding:8px 16px; border-radius:8px; font-size:14px; font-weight:500; border:none; cursor:pointer; transition:background 0.15s; display:inline-block; text-decoration:none; }
 .btn-primary:hover { background:#2C4158; }
-.btn-secondary { background:transparent; color:#3E5C76; padding:8px 16px; border-radius:8px; font-size:14px; font-weight:500; border:1px solid #3E5C76; cursor:pointer; transition:background 0.15s; display:inline-block; text-decoration:none; font-family:Inter,sans-serif; }
+.btn-secondary { background:transparent; color:#3E5C76; padding:8px 16px; border-radius:8px; font-size:14px; font-weight:500; border:1px solid #3E5C76; cursor:pointer; transition:background 0.15s; display:inline-block; text-decoration:none; }
 .btn-secondary:hover { background:#E8EAF6; }
-.btn-danger { background:#BC4A3C; color:white; padding:8px 16px; border-radius:8px; font-size:14px; font-weight:500; border:none; cursor:pointer; transition:background 0.15s; font-family:Inter,sans-serif; }
+.btn-danger { background:#BC4A3C; color:white; padding:8px 16px; border-radius:8px; font-size:14px; font-weight:500; border:none; cursor:pointer; transition:background 0.15s; }
 .btn-danger:hover { background:#8B3228; }
 .btn-sm { padding:4px 12px !important; font-size:12px !important; }
 
 .card { background:white; border-radius:12px; border:0.5px solid #E8DFCF; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
 
-.input { width:100%; border:0.5px solid #E8DFCF; border-radius:8px; padding:8px 12px; font-size:14px; outline:none; background:white; color:#1a1a1a; box-sizing:border-box; font-family:Inter,sans-serif; }
+.input { width:100%; border:0.5px solid #E8DFCF; border-radius:8px; padding:8px 12px; font-size:14px; outline:none; background:white; color:#1a1a1a; box-sizing:border-box; }
 .input:focus { border-color:#3E5C76; box-shadow:0 0 0 2px rgba(62,92,118,0.15); }
 
 .badge-success { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; background:#D1FAE5; color:#065F46; }
