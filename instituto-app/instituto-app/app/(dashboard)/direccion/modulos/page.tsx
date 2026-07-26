@@ -9,10 +9,10 @@ const ESTADOS = ['por_iniciar','en_curso','finalizado','pausado']
 const ESTADO_LABEL: Record<string,string> = { por_iniciar:'Por iniciar', en_curso:'En curso', finalizado:'Finalizado', pausado:'Pausado' }
 const ESTADO_BADGE: Record<string,string> = { por_iniciar:'badge-warning', en_curso:'badge-success', finalizado:'badge-gray', pausado:'badge-danger' }
 
-interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; profesores?:{nombre:string} }
+interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; precio_mes:number; estado:string; profesores?:{nombre:string} }
 interface Profesor { id:string; nombre:string }
 
-const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', precio_mes:0, estado:'por_iniciar' }
+const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar' }
 
 type Filtro = 'todos' | 'en_curso' | 'por_iniciar' | 'finalizado' | 'pausado'
 
@@ -42,7 +42,13 @@ export default function ModulosPage() {
   async function guardar() {
     if (!form.profesor_id || !form.grupo) { setMsg('Completa todos los campos requeridos'); return }
     setSaving(true)
-    const data = { ...form, fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null }
+    const data = {
+      ...form,
+      fecha_inicio: form.fecha_inicio || null,
+      fecha_fin: form.fecha_fin || null,
+      fecha_examen_modulo: form.fecha_examen_modulo || null,
+      fecha_examen_nivel: form.fecha_examen_nivel || null,
+    }
     if (editId) {
       await supabase.from('modulos').update(data).eq('id', editId)
       if (form.fecha_inicio && form.fecha_fin) await supabase.rpc('generar_sesiones', { p_modulo_id: editId })
@@ -54,7 +60,7 @@ export default function ModulosPage() {
   }
 
   function editar(m: Modulo) {
-    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', precio_mes:m.precio_mes, estado:m.estado })
+    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado })
     setEditId(m.id); setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -96,6 +102,18 @@ export default function ModulosPage() {
               <span>·</span><span>{m.horas_sesion}h/sesión</span>
               {m.fecha_inicio && <><span>·</span><span>{m.fecha_inicio} → {m.fecha_fin}</span></>}
               <span>·</span><span>${m.precio_mes}/mes</span>
+            </div>
+            <div style={{ display:'flex', gap:'12px', marginTop:'4px', flexWrap:'wrap' }}>
+              {m.fecha_examen_modulo && (
+                <span style={{ fontSize:'11px', background:'#EDE9FE', color:'#5B21B6', padding:'1px 7px', borderRadius:'4px' }}>
+                  📝 Examen módulo: {m.fecha_examen_modulo}
+                </span>
+              )}
+              {m.fecha_examen_nivel && (
+                <span style={{ fontSize:'11px', background:'#FEF3C7', color:'#92400E', padding:'1px 7px', borderRadius:'4px' }}>
+                  🎓 Examen nivel: {m.fecha_examen_nivel}
+                </span>
+              )}
             </div>
           </div>
           <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
@@ -154,6 +172,23 @@ export default function ModulosPage() {
                 {ESTADOS.map(s => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
               </select></div>
           </div>
+
+          {/* Fechas especiales */}
+          <div style={{ marginTop:'16px', padding:'12px', background:'#F5F0E8', borderRadius:'8px', border:'0.5px solid #E8DFCF' }}>
+            <p style={{ fontSize:'12px', fontWeight:500, color:'#3E5C76', marginBottom:'10px' }}>📅 Fechas especiales (opcionales)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[#6B8294] mb-1">📝 Examen final de módulo</label>
+                <input type="date" className="input" value={form.fecha_examen_modulo} onChange={e => setForm(f => ({ ...f, fecha_examen_modulo: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#6B8294] mb-1">🎓 Examen final de nivel</label>
+                <input type="date" className="input" value={form.fecha_examen_nivel} onChange={e => setForm(f => ({ ...f, fecha_examen_nivel: e.target.value }))} />
+              </div>
+            </div>
+            <p style={{ fontSize:'11px', color:'#9CA8B3', marginTop:'6px' }}>Estas fechas aparecen destacadas en el calendario del profesor.</p>
+          </div>
+
           <div className="mt-3"><label className="block text-xs font-medium text-[#6B8294] mb-2">Días de clase</label>
             <div className="flex gap-2 flex-wrap">
               {DIAS.map(d => <button key={d} type="button" onClick={() => toggleDia(d)}
