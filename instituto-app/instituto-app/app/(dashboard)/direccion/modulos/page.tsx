@@ -42,13 +42,7 @@ export default function ModulosPage() {
   async function guardar() {
     if (!form.profesor_id || !form.grupo) { setMsg('Completa todos los campos requeridos'); return }
     setSaving(true)
-    const data = {
-      ...form,
-      fecha_inicio: form.fecha_inicio || null,
-      fecha_fin: form.fecha_fin || null,
-      fecha_examen_modulo: form.fecha_examen_modulo || null,
-      fecha_examen_nivel: form.fecha_examen_nivel || null,
-    }
+    const data = { ...form, fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null, fecha_examen_modulo: form.fecha_examen_modulo || null, fecha_examen_nivel: form.fecha_examen_nivel || null }
     if (editId) {
       await supabase.from('modulos').update(data).eq('id', editId)
       if (form.fecha_inicio && form.fecha_fin) await supabase.rpc('generar_sesiones', { p_modulo_id: editId })
@@ -103,7 +97,7 @@ export default function ModulosPage() {
               {m.fecha_inicio && <><span>·</span><span>{m.fecha_inicio} → {m.fecha_fin}</span></>}
               <span>·</span><span>${m.precio_mes}/mes</span>
             </div>
-            <div style={{ display:'flex', gap:'12px', marginTop:'4px', flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:'8px', marginTop:'4px', flexWrap:'wrap' }}>
               {m.fecha_examen_modulo && (
                 <span style={{ fontSize:'11px', background:'#EDE9FE', color:'#5B21B6', padding:'1px 7px', borderRadius:'4px' }}>
                   📝 Examen módulo: {m.fecha_examen_modulo}
@@ -116,7 +110,11 @@ export default function ModulosPage() {
               )}
             </div>
           </div>
-          <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
+          <div style={{ display:'flex', gap:'6px', flexShrink:0, alignItems:'center' }}>
+            <a href={`/direccion/modulos/${m.id}`}
+              style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#5B21B6', border:'1px solid #5B21B6', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>
+              Sesiones
+            </a>
             <button onClick={() => editar(m)}
               style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#3E5C76', border:'1px solid #3E5C76', borderRadius:'8px', cursor:'pointer' }}>
               Editar
@@ -172,23 +170,16 @@ export default function ModulosPage() {
                 {ESTADOS.map(s => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
               </select></div>
           </div>
-
-          {/* Fechas especiales */}
           <div style={{ marginTop:'16px', padding:'12px', background:'#F5F0E8', borderRadius:'8px', border:'0.5px solid #E8DFCF' }}>
             <p style={{ fontSize:'12px', fontWeight:500, color:'#3E5C76', marginBottom:'10px' }}>📅 Fechas especiales (opcionales)</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[#6B8294] mb-1">📝 Examen final de módulo</label>
-                <input type="date" className="input" value={form.fecha_examen_modulo} onChange={e => setForm(f => ({ ...f, fecha_examen_modulo: e.target.value }))} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#6B8294] mb-1">🎓 Examen final de nivel</label>
-                <input type="date" className="input" value={form.fecha_examen_nivel} onChange={e => setForm(f => ({ ...f, fecha_examen_nivel: e.target.value }))} />
-              </div>
+              <div><label className="block text-xs font-medium text-[#6B8294] mb-1">📝 Examen final de módulo</label>
+                <input type="date" className="input" value={form.fecha_examen_modulo} onChange={e => setForm(f => ({ ...f, fecha_examen_modulo: e.target.value }))} /></div>
+              <div><label className="block text-xs font-medium text-[#6B8294] mb-1">🎓 Examen final de nivel</label>
+                <input type="date" className="input" value={form.fecha_examen_nivel} onChange={e => setForm(f => ({ ...f, fecha_examen_nivel: e.target.value }))} /></div>
             </div>
             <p style={{ fontSize:'11px', color:'#9CA8B3', marginTop:'6px' }}>Estas fechas aparecen destacadas en el calendario del profesor.</p>
           </div>
-
           <div className="mt-3"><label className="block text-xs font-medium text-[#6B8294] mb-2">Días de clase</label>
             <div className="flex gap-2 flex-wrap">
               {DIAS.map(d => <button key={d} type="button" onClick={() => toggleDia(d)}
@@ -205,7 +196,7 @@ export default function ModulosPage() {
       <div style={{ display:'flex', gap:'6px', marginBottom:'16px', flexWrap:'wrap' }}>
         {filtros.map(f => (
           <button key={f.key} onClick={() => setFiltro(f.key)}
-            style={{ padding:'5px 12px', borderRadius:'8px', fontSize:'12px', cursor:'pointer', border:'1px solid', transition:'all 0.15s', background: filtro === f.key ? '#3E5C76' : 'white', color: filtro === f.key ? '#FAF3E8' : '#6B8294', borderColor: filtro === f.key ? '#3E5C76' : '#E8DFCF' }}>
+            style={{ padding:'5px 12px', borderRadius:'8px', fontSize:'12px', cursor:'pointer', border:'1px solid', background: filtro === f.key ? '#3E5C76' : 'white', color: filtro === f.key ? '#FAF3E8' : '#6B8294', borderColor: filtro === f.key ? '#3E5C76' : '#E8DFCF' }}>
             {f.label} {conteos[f.key] > 0 && <span style={{ fontSize:'10px', opacity:0.8 }}>({conteos[f.key]})</span>}
           </button>
         ))}
