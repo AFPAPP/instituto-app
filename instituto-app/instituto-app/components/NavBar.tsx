@@ -22,14 +22,15 @@ export default function NavBar({ nombre, rol }: NavBarProps) {
 
   const linksProfesor = [{ href: '/profesor', label: 'Mis cursos' }]
   const linksDireccion = [
-    { href: '/direccion',             label: 'Panel' },
-    { href: '/direccion/modulos',     label: 'Módulos' },
-    { href: '/direccion/estudiantes', label: 'Estudiantes' },
-    { href: '/direccion/resumen',     label: 'Resumen' },
-    { href: '/direccion/bilan',       label: 'BILAN' },
-    { href: '/direccion/feriados',    label: 'Feriados' },
-    { href: '/direccion/reemplazos',  label: 'Reemplazos' },
-    { href: '/direccion/usuarios',    label: 'Usuarios' },
+    { href: '/direccion',               label: 'Panel' },
+    { href: '/direccion/modulos',       label: 'Módulos' },
+    { href: '/direccion/estudiantes',   label: 'Estudiantes' },
+    { href: '/direccion/resumen',       label: 'Resumen' },
+    { href: '/direccion/bilan',         label: 'BILAN' },
+    { href: '/direccion/feriados',      label: 'Feriados' },
+    { href: '/direccion/reemplazos',    label: 'Reemplazos' },
+    { href: '/direccion/estadisticas',  label: 'Estadísticas' },
+    { href: '/direccion/usuarios',      label: 'Usuarios' },
   ]
   const links = rol === 'direccion' ? linksDireccion : linksProfesor
 
