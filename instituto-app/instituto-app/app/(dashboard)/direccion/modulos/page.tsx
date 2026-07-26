@@ -126,18 +126,18 @@ export default function ModulosPage() {
                     <span className="text-xs text-[#9CA8B3]">{m.grupo}</span>
                     <span className={ESTADO_BADGE[m.estado]}>{ESTADO_LABEL[m.estado]}</span>
                   </div>
-                  <div className="flex gap-3 mt-1 text-xs text-[#9CA8B3] flex-wrap">
+                  <div className="flex gap-2 mt-1 text-xs text-[#9CA8B3] flex-wrap items-center">
                     <span>{(m.profesores as {nombre:string}|null)?.nombre}</span>
+                    <span>·</span>
                     <span>{m.modalidad}</span>
+                    <span>·</span>
                     <span>{(m.dias as string[]).join('/')}</span>
-                    <span>{m.horas_sesion}h/ses</span>
-                    {m.fecha_inicio && <span>{m.fecha_inicio} → {m.fecha_fin}</span>}
+                    <span>·</span>
+                    <span>{m.horas_sesion}h/sesión</span>
+                    {m.fecha_inicio && <><span>·</span><span>{m.fecha_inicio} → {m.fecha_fin}</span></>}
+                    <span>·</span>
                     <span>${m.precio_mes}/mes</span>
                   </div>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => editar(m)} className="btn-secondary btn-sm">Editar</button>
-                  <button onClick={() => eliminar(m.id)} className="btn-danger btn-sm">✕</button>
                 </div>
               </div>
             </div>
