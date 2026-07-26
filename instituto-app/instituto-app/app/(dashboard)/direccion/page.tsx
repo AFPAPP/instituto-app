@@ -10,7 +10,7 @@ export default async function DireccionPage() {
   if (me?.rol !== 'direccion') redirect('/profesor')
 
   const [{ count: totalEst }, { count: cursosActivos }, { count: totalProfs }, { data: alertas }] = await Promise.all([
-    supabase.from('estudiantes').select('*', { count: 'exact', head: true }),
+    supabase.from('estudiantes').select('*', { count: 'exact', head: true }).eq('retirado', false),
     supabase.from('modulos').select('*', { count: 'exact', head: true }).eq('estado', 'en_curso'),
     supabase.from('profesores').select('*', { count: 'exact', head: true }).eq('rol', 'profesor'),
     supabase.from('vista_resumen').select('apellido, nombre, porcentaje_asistencia, nivel, modulo').lt('porcentaje_asistencia', 0.75).gt('porcentaje_asistencia', 0),
@@ -28,12 +28,14 @@ export default async function DireccionPage() {
   ]
 
   const accesos = [
-    { href: '/direccion/modulos',     icon: '📚', label: 'Módulos',     desc: 'Crear y configurar cursos' },
-    { href: '/direccion/estudiantes', icon: '👥', label: 'Estudiantes', desc: 'Registrar y gestionar alumnos' },
-    { href: '/direccion/resumen',     icon: '📊', label: 'Resumen',     desc: 'Estado financiero por curso' },
-    { href: '/direccion/bilan',       icon: '📋', label: 'BILAN',       desc: 'Registro oficial anual' },
-    { href: '/direccion/feriados',    icon: '📅', label: 'Feriados',    desc: 'Días no lectivos del año' },
-    { href: '/direccion/usuarios',    icon: '🔑', label: 'Usuarios',    desc: 'Cuentas de profesores' },
+    { href: '/direccion/modulos',      icon: '📚', label: 'Módulos',       desc: 'Crear y configurar cursos' },
+    { href: '/direccion/estudiantes',  icon: '👥', label: 'Estudiantes',   desc: 'Registrar y gestionar alumnos' },
+    { href: '/direccion/resumen',      icon: '📊', label: 'Resumen',       desc: 'Estado financiero por curso' },
+    { href: '/direccion/bilan',        icon: '📋', label: 'BILAN',         desc: 'Registro oficial anual' },
+    { href: '/direccion/feriados',     icon: '📅', label: 'Feriados',      desc: 'Días no lectivos del año' },
+    { href: '/direccion/reemplazos',   icon: '👤', label: 'Reemplazos',    desc: 'Control de reemplazos del mes' },
+    { href: '/direccion/estadisticas', icon: '📈', label: 'Estadísticas',  desc: 'Análisis por nivel' },
+    { href: '/direccion/usuarios',     icon: '🔑', label: 'Usuarios',      desc: 'Cuentas de profesores' },
   ]
 
   return (
@@ -67,11 +69,11 @@ export default async function DireccionPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {accesos.map(l => (
           <Link key={l.href} href={l.href} className="card hover:shadow-md transition-shadow flex items-start gap-3" style={{ textDecoration:'none' }}>
             <span className="text-2xl">{l.icon}</span>
-            <div><p className="font-medium text-[#3E5C76]">{l.label}</p><p className="text-xs text-[#9CA8B3] mt-0.5">{l.desc}</p></div>
+            <div><p className="font-medium text-[#3E5C76] text-sm">{l.label}</p><p className="text-xs text-[#9CA8B3] mt-0.5">{l.desc}</p></div>
           </Link>
         ))}
       </div>
