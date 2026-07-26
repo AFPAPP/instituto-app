@@ -54,7 +54,7 @@ export default async function EstadisticasPage() {
           <h1 className="text-2xl font-bold text-[#3E5C76]">Estadísticas</h1>
           <p className="text-[#6B8294] text-sm">Panorama general del instituto por nivel</p>
         </div>
-        <button onClick={() => (window as any).print()} className="btn-primary">🖨️ Imprimir</button>
+       
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
