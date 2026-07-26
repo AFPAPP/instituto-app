@@ -21,10 +21,10 @@ export default async function DireccionPage() {
     .in('estado', ['en_curso', 'por_iniciar']).order('estado')
 
   const metricas = [
-    { label: 'Estudiantes activos', val: totalEst || 0,        color: '#3E5C76' },
-    { label: 'Cursos en curso',     val: cursosActivos || 0,   color: '#1B5E20' },
-    { label: 'Profesores',          val: totalProfs || 0,      color: '#3E5C76' },
-    { label: 'Alertas asistencia',  val: alertas?.length || 0, color: alertas && alertas.length > 0 ? '#BC4A3C' : '#1B5E20' },
+    { label: 'Estudiantes activos', val: totalEst || 0,        color: 'text-[#3E5C76]' },
+    { label: 'Cursos en curso',     val: cursosActivos || 0,   color: 'text-green-700' },
+    { label: 'Profesores',          val: totalProfs || 0,      color: 'text-[#3E5C76]' },
+    { label: 'Alertas asistencia',  val: alertas?.length || 0, color: alertas && alertas.length > 0 ? 'text-[#BC4A3C]' : 'text-green-700' },
   ]
 
   const accesos = [
@@ -32,81 +32,67 @@ export default async function DireccionPage() {
     { href: '/direccion/estudiantes', icon: '👥', label: 'Estudiantes', desc: 'Registrar y gestionar alumnos' },
     { href: '/direccion/resumen',     icon: '📊', label: 'Resumen',     desc: 'Estado financiero por curso' },
     { href: '/direccion/bilan',       icon: '📋', label: 'BILAN',       desc: 'Registro oficial anual' },
+    { href: '/direccion/feriados',    icon: '📅', label: 'Feriados',    desc: 'Días no lectivos del año' },
     { href: '/direccion/usuarios',    icon: '🔑', label: 'Usuarios',    desc: 'Cuentas de profesores' },
   ]
 
   return (
     <div>
-      <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:'24px', fontWeight:500, color:'#3E5C76', marginBottom:'24px' }}>
-        Panel de dirección
-      </h1>
+      <h1 className="text-2xl font-bold text-[#3E5C76] mb-6">Panel de dirección</h1>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'12px', marginBottom:'24px' }}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         {metricas.map(m => (
-          <div key={m.label} style={{ background:'white', borderRadius:'12px', border:'0.5px solid #E8DFCF', padding:'16px', textAlign:'center', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
-            <p style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:'28px', fontWeight:500, color:m.color, margin:0 }}>{m.val}</p>
-            <p style={{ fontSize:'12px', color:'#9CA8B3', margin:'4px 0 0', fontFamily:'Inter,sans-serif' }}>{m.label}</p>
+          <div key={m.label} className="card text-center">
+            <p className={`text-2xl font-bold ${m.color}`}>{m.val}</p>
+            <p className="text-xs text-[#9CA8B3] mt-1">{m.label}</p>
           </div>
         ))}
       </div>
 
       {alertas && alertas.length > 0 && (
-        <div style={{ background:'white', borderRadius:'12px', border:'1px solid #BC4A3C', padding:'16px', marginBottom:'24px', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:'16px', color:'#BC4A3C', marginBottom:'12px', fontWeight:500 }}>
-            ⚠️ Alertas de baja asistencia (&lt;75%)
-          </h2>
-          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+        <div className="card border-[#BC4A3C] border mb-6">
+          <h2 className="font-semibold text-[#BC4A3C] mb-3">⚠️ Alertas de baja asistencia (&lt;75%)</h2>
+          <div className="space-y-2">
             {alertas.slice(0, 5).map((a, i) => (
-              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'13px' }}>
-                <span style={{ color:'#1a1a1a', fontFamily:'Inter,sans-serif' }}>{a.apellido}, {a.nombre}</span>
-                <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                  <span style={{ fontSize:'11px', color:'#9CA8B3', fontFamily:'Inter,sans-serif' }}>{a.nivel} {a.modulo}</span>
-                  <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:500, background:'#FEE2E2', color:'#991B1B' }}>
-                    {Math.round((a.porcentaje_asistencia || 0) * 100)}%
-                  </span>
+              <div key={i} className="flex items-center justify-between text-sm">
+                <span className="text-[#1a1a1a]">{a.apellido}, {a.nombre}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#6B8294] text-xs">{a.nivel} {a.modulo}</span>
+                  <span className="badge-danger">{Math.round((a.porcentaje_asistencia || 0) * 100)}%</span>
                 </div>
               </div>
             ))}
           </div>
-          <Link href="/direccion/resumen" style={{ fontSize:'12px', color:'#3E5C76', textDecoration:'none', marginTop:'8px', display:'block' }}>
-            Ver resumen completo →
-          </Link>
+          <Link href="/direccion/resumen" className="text-xs text-[#3E5C76] hover:underline mt-2 block">Ver resumen completo →</Link>
         </div>
       )}
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px', marginBottom:'24px' }}>
-        {accesos.map(a => (
-          <Link key={a.href} href={a.href} style={{ textDecoration:'none' }}>
-            <div style={{ background:'white', borderRadius:'12px', border:'0.5px solid #E8DFCF', padding:'16px', display:'flex', alignItems:'center', gap:'12px', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
-              <span style={{ fontSize:'22px' }}>{a.icon}</span>
-              <div>
-                <p style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:'14px', fontWeight:500, color:'#3E5C76', margin:0 }}>{a.label}</p>
-                <p style={{ fontSize:'11px', color:'#9CA8B3', margin:'2px 0 0', fontFamily:'Inter,sans-serif' }}>{a.desc}</p>
-              </div>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+        {accesos.map(l => (
+          <Link key={l.href} href={l.href} className="card hover:shadow-md transition-shadow flex items-start gap-3" style={{ textDecoration:'none' }}>
+            <span className="text-2xl">{l.icon}</span>
+            <div><p className="font-medium text-[#3E5C76]">{l.label}</p><p className="text-xs text-[#9CA8B3] mt-0.5">{l.desc}</p></div>
           </Link>
         ))}
       </div>
 
       {modulos && modulos.length > 0 && (
         <div>
-          <h2 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:'16px', color:'#3E5C76', marginBottom:'12px', fontWeight:500 }}>Cursos activos</h2>
-          <div style={{ background:'white', borderRadius:'12px', border:'0.5px solid #E8DFCF', overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
-            {modulos.map((m, i) => (
-              <div key={m.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', borderBottom: i < modulos.length-1 ? '0.5px solid #E8DFCF' : 'none' }}>
-                <div>
-                  <p style={{ fontSize:'13px', fontWeight:500, color:'#1a1a1a', margin:0, fontFamily:'Inter,sans-serif' }}>
-                    {m.nivel} — {m.modulo} <span style={{ color:'#9CA8B3', fontWeight:400 }}>({m.grupo})</span>
-                  </p>
-                  <p style={{ fontSize:'11px', color:'#9CA8B3', margin:'2px 0 0', fontFamily:'Inter,sans-serif' }}>
-                    {(m.profesores as { nombre: string } | null)?.nombre}
-                  </p>
+          <h2 className="font-semibold text-[#3E5C76] mb-3">Cursos activos</h2>
+          <div className="card p-0 overflow-hidden">
+            <div className="divide-y divide-[#E8DFCF]">
+              {modulos.map(m => (
+                <div key={m.id} className="flex items-center justify-between p-3 hover:bg-[#FAF3E8] transition-colors">
+                  <div>
+                    <p className="font-medium text-sm text-[#1a1a1a]">{m.nivel} — {m.modulo} <span className="text-[#9CA8B3] font-normal">({m.grupo})</span></p>
+                    <p className="text-xs text-[#9CA8B3]">{(m.profesores as { nombre: string } | null)?.nombre}</p>
+                  </div>
+                  <span className={m.estado === 'en_curso' ? 'badge-success' : 'badge-warning'}>
+                    {m.estado === 'en_curso' ? 'En curso' : 'Por iniciar'}
+                  </span>
                 </div>
-                <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:500, background: m.estado === 'en_curso' ? '#D1FAE5' : '#FEF3C7', color: m.estado === 'en_curso' ? '#065F46' : '#92400E' }}>
-                  {m.estado === 'en_curso' ? 'En curso' : 'Por iniciar'}
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
