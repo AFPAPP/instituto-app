@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesores?:{nombre:string} }
-interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; descuento_pct:number; estado_pago:string; modulos?:{nivel:string;modulo:string;grupo:string} }
+interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
 
 const ESTADOS_PAGO = ['pendiente','pagado','becado']
 const PAGO_BADGE: Record<string,string> = { pagado:'badge-success', pendiente:'badge-warning', becado:'badge-purple' }
@@ -19,18 +19,27 @@ export default function EstudiantesPage() {
   const [editId, setEditId] = useState<string|null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [retiroId, setRetiroId] = useState<string|null>(null)
+  const [retiroFecha, setRetiroFecha] = useState('')
+  const [retiroMotivo, setRetiroMotivo] = useState('')
+  const [mostrarRetirados, setMostrarRetirados] = useState(false)
 
   useEffect(() => {
     supabase.from('modulos').select('id, nivel, modulo, grupo, profesores(nombre)').order('nivel').order('modulo').then(({ data }) => {
-      setModulos(data || [])
+      setModulos(((data as unknown) as Modulo[]) || [])
       if (data && data.length > 0) setModuloSel(data[0].id)
     })
   }, [])
 
   useEffect(() => {
     if (!moduloSel) return
-    supabase.from('estudiantes').select('*, modulos(nivel, modulo, grupo)').eq('modulo_id', moduloSel).order('apellido').then(({ data }) => setEstudiantes(data || []))
+    supabase.from('estudiantes').select('*, modulos(nivel, modulo, grupo)').eq('modulo_id', moduloSel).order('apellido').then(({ data }) => setEstudiantes(((data as unknown) as Estudiante[]) || []))
   }, [moduloSel])
+
+  async function recargar() {
+    const { data } = await supabase.from('estudiantes').select('*, modulos(nivel, modulo, grupo)').eq('modulo_id', moduloSel).order('apellido')
+    setEstudiantes(((data as unknown) as Estudiante[]) || [])
+  }
 
   async function guardar() {
     if (!form.apellido || !form.modulo_id) return
@@ -38,8 +47,7 @@ export default function EstudiantesPage() {
     if (editId) await supabase.from('estudiantes').update(form).eq('id', editId)
     else await supabase.from('estudiantes').insert({ ...form })
     setSaving(false); setShowForm(false); setEditId(null); setForm({ ...emptyEst, modulo_id: moduloSel })
-    const { data } = await supabase.from('estudiantes').select('*, modulos(nivel, modulo, grupo)').eq('modulo_id', moduloSel).order('apellido')
-    setEstudiantes(data || [])
+    recargar()
   }
 
   async function actualizarPago(id: string, estado_pago: string) {
@@ -53,6 +61,21 @@ export default function EstudiantesPage() {
     setEstudiantes(prev => prev.filter(e => e.id !== id))
   }
 
+  async function confirmarRetiro(id: string) {
+    if (!retiroFecha) { alert('Selecciona la fecha de retiro'); return }
+    setSaving(true)
+    await supabase.from('estudiantes').update({ retirado: true, fecha_retiro: retiroFecha, motivo_retiro: retiroMotivo || null }).eq('id', id)
+    setRetiroId(null); setRetiroFecha(''); setRetiroMotivo('')
+    setSaving(false); recargar()
+  }
+
+  async function reactivar(id: string) {
+    await supabase.from('estudiantes').update({ retirado: false, fecha_retiro: null, motivo_retiro: null }).eq('id', id)
+    recargar()
+  }
+
+  const activos   = estudiantes.filter(e => !e.retirado)
+  const retirados = estudiantes.filter(e => e.retirado)
   const modActual = modulos.find(m => m.id === moduloSel)
 
   return (
@@ -67,7 +90,12 @@ export default function EstudiantesPage() {
         <select className="input" value={moduloSel} onChange={e => setModuloSel(e.target.value)}>
           {modulos.map(m => <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre}</option>)}
         </select>
-        {modActual && <p className="text-xs text-[#9CA8B3] mt-1">{estudiantes.length} estudiante(s) registrado(s)</p>}
+        {modActual && (
+          <p className="text-xs text-[#9CA8B3] mt-1">
+            {activos.length} activo{activos.length !== 1 ? 's' : ''}
+            {retirados.length > 0 && ` · ${retirados.length} retirado${retirados.length !== 1 ? 's' : ''}`}
+          </p>
+        )}
       </div>
 
       {showForm && (
@@ -83,7 +111,7 @@ export default function EstudiantesPage() {
               <input className="input" placeholder="GARCIA LOPEZ" value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value.toUpperCase() }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Nombre(s)</label>
               <input className="input" placeholder="María" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} /></div>
-            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">% Descuento (0 = precio completo · 100 = becado)</label>
+            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">% Descuento</label>
               <input type="number" className="input" min="0" max="100" value={form.descuento_pct} onChange={e => setForm(f => ({ ...f, descuento_pct: Math.min(100, Math.max(0, parseInt(e.target.value)||0)) }))} /></div>
           </div>
           <div className="flex gap-2 mt-4">
@@ -93,33 +121,97 @@ export default function EstudiantesPage() {
         </div>
       )}
 
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden mb-4">
         <div className="divide-y divide-[#E8DFCF]">
-          {estudiantes.map(e => (
-            <div key={e.id} className="flex items-center justify-between p-3 hover:bg-[#FAF3E8] transition-colors gap-2 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#3E5C76] text-[#FAF3E8] flex items-center justify-center text-xs font-semibold flex-shrink-0">{e.apellido[0]}{e.nombre[0]}</div>
-                <div>
-                  <p className="font-medium text-sm text-[#1a1a1a]">{e.apellido}, {e.nombre}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-[#9CA8B3]">{e.descuento_pct > 0 ? `${e.descuento_pct}% descuento` : 'Precio completo'}</span>
-                    <span className={PAGO_BADGE[e.estado_pago]}>{PAGO_LABEL[e.estado_pago]}</span>
+          {activos.map(e => (
+            <div key={e.id}>
+              <div className="flex items-center justify-between p-3 hover:bg-[#FAF3E8] transition-colors gap-2 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-[#3E5C76] text-[#FAF3E8] flex items-center justify-center text-xs font-semibold flex-shrink-0">{e.apellido[0]}{e.nombre[0]}</div>
+                  <div>
+                    <p className="font-medium text-sm text-[#1a1a1a]">{e.apellido}, {e.nombre}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-[#9CA8B3]">{e.descuento_pct > 0 ? `${e.descuento_pct}% descuento` : 'Precio completo'}</span>
+                      <span className={PAGO_BADGE[e.estado_pago]}>{PAGO_LABEL[e.estado_pago]}</span>
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select className="text-xs border border-[#E8DFCF] rounded-lg px-2 py-1 bg-white text-[#1a1a1a]"
+                    value={e.estado_pago} onChange={ev => actualizarPago(e.id, ev.target.value)}>
+                    {ESTADOS_PAGO.map(ep => <option key={ep} value={ep}>{PAGO_LABEL[ep]}</option>)}
+                  </select>
+                  <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
+                  <button onClick={() => { setRetiroId(e.id); setRetiroFecha(''); setRetiroMotivo('') }}
+                    style={{ padding:'4px 10px', fontSize:'12px', background:'transparent', color:'#92400E', border:'1px solid #D97706', borderRadius:'8px', cursor:'pointer' }}>
+                    Retirar
+                  </button>
+                  <button onClick={() => eliminar(e.id)} className="btn-danger btn-sm">✕</button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <select className="text-xs border border-[#E8DFCF] rounded-lg px-2 py-1 bg-white text-[#1a1a1a]"
-                  value={e.estado_pago} onChange={ev => actualizarPago(e.id, ev.target.value)}>
-                  {ESTADOS_PAGO.map(ep => <option key={ep} value={ep}>{PAGO_LABEL[ep]}</option>)}
-                </select>
-                <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
-                <button onClick={() => eliminar(e.id)} className="btn-danger btn-sm">✕</button>
-              </div>
+              {retiroId === e.id && (
+                <div style={{ padding:'12px 16px', background:'#FFFBEB', borderTop:'0.5px solid #FDE68A' }}>
+                  <p style={{ fontSize:'12px', fontWeight:500, color:'#92400E', marginBottom:'8px' }}>⚠️ Registrar retiro de {e.nombre} {e.apellido}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha de retiro *</label>
+                      <input type="date" className="input" value={retiroFecha} onChange={ev => setRetiroFecha(ev.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#6B8294] mb-1">Motivo (opcional)</label>
+                      <input type="text" className="input" placeholder="Ej: Motivos personales" value={retiroMotivo} onChange={ev => setRetiroMotivo(ev.target.value)} />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => confirmarRetiro(e.id)} disabled={saving}
+                      style={{ padding:'6px 14px', fontSize:'12px', background:'#D97706', color:'white', border:'none', borderRadius:'8px', cursor:'pointer' }}>
+                      {saving ? 'Guardando...' : 'Confirmar retiro'}
+                    </button>
+                    <button onClick={() => setRetiroId(null)} className="btn-secondary btn-sm">Cancelar</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
-          {estudiantes.length === 0 && moduloSel && <div className="p-8 text-center text-[#9CA8B3] text-sm">No hay estudiantes en este módulo.</div>}
+          {activos.length === 0 && moduloSel && (
+            <div className="p-8 text-center text-[#9CA8B3] text-sm">No hay estudiantes activos en este módulo.</div>
+          )}
         </div>
       </div>
+
+      {retirados.length > 0 && (
+        <div>
+          <button onClick={() => setMostrarRetirados(!mostrarRetirados)}
+            style={{ fontSize:'12px', fontWeight:500, color:'#9CA8B3', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'8px', background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px' }}>
+            {mostrarRetirados ? '▼' : '▶'} Estudiantes retirados ({retirados.length})
+          </button>
+          {mostrarRetirados && (
+            <div className="card p-0 overflow-hidden">
+              <div className="divide-y divide-[#E8DFCF]">
+                {retirados.map(e => (
+                  <div key={e.id} className="flex items-center justify-between p-3 gap-2 flex-wrap" style={{ opacity:0.7 }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gray-400 text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">{e.apellido[0]}{e.nombre[0]}</div>
+                      <div>
+                        <p className="font-medium text-sm text-[#6B8294] line-through">{e.apellido}, {e.nombre}</p>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="badge-gray">Retirado</span>
+                          {e.fecha_retiro && <span className="text-xs text-[#9CA8B3]">desde {e.fecha_retiro}</span>}
+                          {e.motivo_retiro && <span className="text-xs text-[#9CA8B3]">· {e.motivo_retiro}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => reactivar(e.id)}
+                      style={{ padding:'4px 10px', fontSize:'12px', background:'transparent', color:'#3E5C76', border:'1px solid #3E5C76', borderRadius:'8px', cursor:'pointer' }}>
+                      Reactivar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
