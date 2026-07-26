@@ -4,17 +4,23 @@ import Link from 'next/link'
 
 const DIAS_MAP: Record<string, number> = { Do:0, Lu:1, Ma:2, Mi:3, Ju:4, Vi:5, Sa:6, Sá:6 }
 
-function getCalendarDays(inicio: string, fin: string, dias: string[], feriados: string[]) {
+function getCalendarDays(inicio: string, fin: string, dias: string[], feriados: string[], examenModulo: string | null, examenNivel: string | null) {
   const start = new Date(inicio + 'T12:00:00')
   const end   = new Date(fin   + 'T12:00:00')
   const diasNums = dias.map(d => DIAS_MAP[d]).filter(n => n !== undefined)
-  const result: { fecha: string; esClase: boolean; esFeriado: boolean }[] = []
+  const result: { fecha: string; esClase: boolean; esFeriado: boolean; esExamenModulo: boolean; esExamenNivel: boolean }[] = []
   const cur = new Date(start.getFullYear(), start.getMonth(), 1)
   const endMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0)
   while (cur <= endMonth) {
     const f = cur.toISOString().split('T')[0]
     const esClase = cur >= start && cur <= end && diasNums.includes(cur.getDay())
-    result.push({ fecha: f, esClase, esFeriado: feriados.includes(f) })
+    result.push({
+      fecha: f,
+      esClase,
+      esFeriado: feriados.includes(f),
+      esExamenModulo: examenModulo === f,
+      esExamenNivel: examenNivel === f,
+    })
     cur.setDate(cur.getDate() + 1)
   }
   return result
@@ -37,7 +43,7 @@ export default async function CursoPage({ params }: { params: Promise<{ id: stri
     .from('sesiones').select('id, fecha, numero_clase').eq('modulo_id', id).order('fecha')
 
   const { data: estudiantesRaw } = await supabase
-    .from('estudiantes').select('id, apellido, nombre').eq('modulo_id', id)
+    .from('estudiantes').select('id').eq('modulo_id', id)
   const totalEst = estudiantesRaw?.length || 0
 
   const hoy = new Date().toISOString().split('T')[0]
@@ -49,7 +55,7 @@ export default async function CursoPage({ params }: { params: Promise<{ id: stri
     : null
 
   const calDays = modulo.fecha_inicio && modulo.fecha_fin
-    ? getCalendarDays(modulo.fecha_inicio, modulo.fecha_fin, modulo.dias as string[], feriadosStr)
+    ? getCalendarDays(modulo.fecha_inicio, modulo.fecha_fin, modulo.dias as string[], feriadosStr, modulo.fecha_examen_modulo || null, modulo.fecha_examen_nivel || null)
     : []
 
   const MESES_ESP = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -76,6 +82,34 @@ export default async function CursoPage({ params }: { params: Promise<{ id: stri
           <Link href={`/profesor/curso/${id}/notas`} className="btn-secondary">Notas finales</Link>
         </div>
       </div>
+
+      {/* Fechas especiales destacadas */}
+      {(modulo.fecha_examen_modulo || modulo.fecha_examen_nivel) && (
+        <div className="card mb-4 flex gap-4 flex-wrap">
+          {modulo.fecha_examen_modulo && (
+            <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+              <span style={{ fontSize:'20px' }}>📝</span>
+              <div>
+                <p style={{ fontSize:'11px', color:'#9CA8B3', margin:0 }}>Examen final de módulo</p>
+                <p style={{ fontSize:'13px', fontWeight:500, color:'#5B21B6', margin:0 }}>
+                  {new Date(modulo.fecha_examen_modulo + 'T12:00:00').toLocaleDateString('es-EC', { weekday:'long', day:'numeric', month:'long' })}
+                </p>
+              </div>
+            </div>
+          )}
+          {modulo.fecha_examen_nivel && (
+            <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+              <span style={{ fontSize:'20px' }}>🎓</span>
+              <div>
+                <p style={{ fontSize:'11px', color:'#9CA8B3', margin:0 }}>Examen final de nivel</p>
+                <p style={{ fontSize:'13px', fontWeight:500, color:'#92400E', margin:0 }}>
+                  {new Date(modulo.fecha_examen_nivel + 'T12:00:00').toLocaleDateString('es-EC', { weekday:'long', day:'numeric', month:'long' })}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
@@ -117,16 +151,24 @@ export default async function CursoPage({ params }: { params: Promise<{ id: stri
                 {blanks.map((_, i) => <div key={`b${i}`} />)}
                 {dias.map(d => {
                   const n = new Date(d.fecha + 'T12:00:00').getDate()
-                  let cls = 'text-[11px] py-1 rounded '
-                  if (d.esFeriado) cls += 'bg-red-100 text-red-600 font-semibold'
-                  else if (d.esClase) cls += 'bg-[#3E5C76] text-white font-semibold'
-                  else cls += 'text-[#9CA8B3]'
-                  return <div key={d.fecha} className={cls}>{n}</div>
+                  let bg = 'transparent', color = '#9CA8B3', fw = 'normal', title = ''
+                  if (d.esExamenNivel)   { bg = '#FEF3C7'; color = '#92400E'; fw = '600'; title = 'Examen nivel' }
+                  else if (d.esExamenModulo) { bg = '#EDE9FE'; color = '#5B21B6'; fw = '600'; title = 'Examen módulo' }
+                  else if (d.esFeriado)  { bg = '#FFCDD2'; color = '#B71C1C'; fw = '600'; title = 'Feriado' }
+                  else if (d.esClase)    { bg = '#3E5C76'; color = 'white';   fw = '600' }
+                  return (
+                    <div key={d.fecha} title={title}
+                      style={{ fontSize:'11px', padding:'3px 1px', borderRadius:'4px', backgroundColor:bg, color, fontWeight:fw, cursor: title ? 'help' : 'default' }}>
+                      {n}
+                    </div>
+                  )
                 })}
               </div>
-              <div className="flex gap-3 mt-3 text-[10px] text-[#9CA8B3]">
-                <span><span className="inline-block w-2 h-2 rounded bg-[#3E5C76] mr-1" />Clase</span>
-                <span><span className="inline-block w-2 h-2 rounded bg-red-200 mr-1" />Feriado</span>
+              <div className="flex gap-3 mt-3 flex-wrap" style={{ fontSize:'10px', color:'#9CA8B3' }}>
+                <span><span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'2px', background:'#3E5C76', marginRight:'3px' }}/>Clase</span>
+                <span><span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'2px', background:'#FFCDD2', marginRight:'3px' }}/>Feriado</span>
+                <span><span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'2px', background:'#EDE9FE', marginRight:'3px' }}/>Exam. módulo</span>
+                <span><span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'2px', background:'#FEF3C7', marginRight:'3px' }}/>Exam. nivel</span>
               </div>
             </div>
           )
