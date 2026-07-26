@@ -34,9 +34,7 @@ export default async function BilanPage() {
           <h1 className="text-2xl font-bold text-[#3E5C76]">BILAN — Resumen anual</h1>
           <p className="text-[#6B8294] text-sm">Registro consolidado de todos los cursos</p>
         </div>
-        <button onClick={() => window.print()} className="btn-primary" style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-          🖨️ Imprimir / Guardar PDF
-        </button>
+
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
