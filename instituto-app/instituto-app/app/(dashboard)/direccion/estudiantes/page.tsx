@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesores?:{nombre:string} }
+interface Modulo { id:string; nivel:string; modulo:string; grupo:string; estado:string; profesores?:{nombre:string} }
 interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
 
 const ESTADOS_PAGO = ['pendiente','pagado','becado']
@@ -25,7 +25,7 @@ export default function EstudiantesPage() {
   const [mostrarRetirados, setMostrarRetirados] = useState(false)
 
   useEffect(() => {
-    supabase.from('modulos').select('id, nivel, modulo, grupo, profesores(nombre)').order('nivel').order('modulo').then(({ data }) => {
+    supabase.from('modulos').select('id, nivel, modulo, grupo, estado, profesores(nombre)').order('nivel').order('modulo').then(({ data }) => {
       setModulos(((data as unknown) as Modulo[]) || [])
       if (data && data.length > 0) setModuloSel(data[0].id)
     })
@@ -88,7 +88,16 @@ export default function EstudiantesPage() {
       <div className="card mb-4">
         <label className="block text-sm font-medium text-[#3E5C76] mb-2">Módulo</label>
         <select className="input" value={moduloSel} onChange={e => setModuloSel(e.target.value)}>
-          {modulos.map(m => <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre}</option>)}
+ <optgroup label="── Activos ──">
+          {modulos.filter(m => m.estado !== 'finalizado').map(m => (
+            <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre}</option>
+          ))}
+        </optgroup>
+        <optgroup label="── Finalizados ──">
+          {modulos.filter(m => m.estado === 'finalizado').map(m => (
+            <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre} [Finalizado]</option>
+          ))}
+        </optgroup>
         </select>
         {modActual && (
           <p className="text-xs text-[#9CA8B3] mt-1">
