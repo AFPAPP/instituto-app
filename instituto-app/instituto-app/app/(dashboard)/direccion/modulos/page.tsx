@@ -111,6 +111,10 @@ export default function ModulosPage() {
             </div>
           </div>
           <div style={{ display:'flex', gap:'6px', flexShrink:0, alignItems:'center' }}>
+           <a href={`/direccion/modulos/${m.id}/imprimir`}
+              style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#1B5E20', border:'1px solid #1B5E20', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>
+              🖨️
+            </a>
             <a href={`/direccion/modulos/${m.id}`}
               style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#5B21B6', border:'1px solid #5B21B6', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>
               Sesiones
