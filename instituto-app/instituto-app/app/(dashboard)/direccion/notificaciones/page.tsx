@@ -45,7 +45,8 @@ export default async function NotificacionesPage() {
   const { data: todosModulos } = await supabase.from('modulos').select('id, nivel, modulo, grupo, profesores(nombre)').eq('estado', 'en_curso')
   for (const mod of todosModulos || []) {
     const { data: ests } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', mod.id).eq('retirado', false)
-    const { data: sesiones } = await supabase.from('sesiones').select('id, fecha, numero_clase').eq('modulo_id', mod.id).order('fecha')
+       const hoy = new Date().toISOString().split('T')[0]
+    const { data: sesiones } = await supabase.from('sesiones').select('id, fecha').eq('modulo_id', mod.id).lte('fecha', hoy).order('fecha')
     if (!ests || !sesiones || sesiones.length < 2) continue
     for (const est of ests) {
       const { data: asis } = await supabase.from('asistencias').select('sesion_id, asistio').eq('estudiante_id', est.id).in('sesion_id', sesiones.map(s => s.id))
