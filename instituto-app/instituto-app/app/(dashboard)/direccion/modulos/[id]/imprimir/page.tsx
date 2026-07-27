@@ -19,6 +19,11 @@ export default async function ImprimirModuloPage({ params }: { params: Promise<{
   const feriadosSet = new Set(feriados?.map(f => f.fecha) || [])
 
   const estIds = estudiantes?.map(e => e.id) || []
+    const notasMap = new Map<string, {p_oral:number|null;p_escrita:number|null;c_oral:number|null;c_escrita:number|null}>()
+  if (estIds.length > 0 && modulo.estado === 'finalizado') {
+    const { data: notasData } = await supabase.from('notas').select('estudiante_id, p_oral, p_escrita, c_oral, c_escrita').in('estudiante_id', estIds)
+    notasData?.forEach(n => notasMap.set(n.estudiante_id, { p_oral:n.p_oral, p_escrita:n.p_escrita, c_oral:n.c_oral, c_escrita:n.c_escrita }))
+  }
   const sesIds = sesiones?.map(s => s.id) || []
   let asistenciaMap: Map<string, Map<string, boolean>> = new Map()
   if (estIds.length > 0 && sesIds.length > 0) {
@@ -195,7 +200,48 @@ export default async function ImprimirModuloPage({ params }: { params: Promise<{
         </table>
         <p style={{ fontSize:'9px', color:'#9CA8B3', marginTop:'4px', fontStyle:'italic' }}>Los campos en blanco se llenan manualmente</p>
       </div>
-
+      {/* NOTAS — solo si el módulo está finalizado */}
+      {modulo.estado === 'finalizado' && (
+        <div style={{ marginTop:'16px' }}>
+          <div style={{ fontSize:'11px', fontWeight:700, color:'#3E5C76', textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1.5px solid #3E5C76', paddingBottom:'3px', marginBottom:'8px' }}>
+            Notas finales
+          </div>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'10px' }}>
+            <thead>
+              <tr>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px 6px', textAlign:'left', fontSize:'9px', border:'0.5px solid #aaa', minWidth:'130px' }}>Estudiante</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px', textAlign:'center', fontSize:'9px', border:'0.5px solid #aaa', width:'55px' }}>P. Oral</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px', textAlign:'center', fontSize:'9px', border:'0.5px solid #aaa', width:'55px' }}>P. Escrita</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px', textAlign:'center', fontSize:'9px', border:'0.5px solid #aaa', width:'55px' }}>C. Oral</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px', textAlign:'center', fontSize:'9px', border:'0.5px solid #aaa', width:'55px' }}>C. Escrita</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px', textAlign:'center', fontSize:'9px', border:'0.5px solid #aaa', width:'55px' }}>Total</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px', textAlign:'center', fontSize:'9px', border:'0.5px solid #aaa', width:'65px' }}>Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {estudiantes?.map((est, i) => {
+                const nota = notasMap.get(est.id)
+                const total = nota ? (nota.p_oral??0)+(nota.p_escrita??0)+(nota.c_oral??0)+(nota.c_escrita??0) : null
+                const aprobado = total !== null && total >= 50
+                return (
+                  <tr key={est.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
+                    <td style={{ padding:'3px 6px', fontSize:'9px', fontWeight:500, border:'0.5px solid #ccc' }}>{est.apellido}, {est.nombre}</td>
+                    <td style={{ padding:'3px', textAlign:'center', border:'0.5px solid #ccc', fontSize:'9px' }}>{nota?.p_oral ?? '—'}</td>
+                    <td style={{ padding:'3px', textAlign:'center', border:'0.5px solid #ccc', fontSize:'9px' }}>{nota?.p_escrita ?? '—'}</td>
+                    <td style={{ padding:'3px', textAlign:'center', border:'0.5px solid #ccc', fontSize:'9px' }}>{nota?.c_oral ?? '—'}</td>
+                    <td style={{ padding:'3px', textAlign:'center', border:'0.5px solid #ccc', fontSize:'9px' }}>{nota?.c_escrita ?? '—'}</td>
+                    <td style={{ padding:'3px', textAlign:'center', border:'0.5px solid #ccc', fontSize:'9px', fontWeight:700 }}>{total ?? '—'}/100</td>
+                    <td style={{ padding:'3px', textAlign:'center', border:'0.5px solid #ccc', fontSize:'9px', fontWeight:700, color: total === null ? '#9CA8B3' : aprobado ? '#065F46' : '#991B1B', background: total === null ? 'white' : aprobado ? '#D1FAE5' : '#FEE2E2' }}>
+                      {total === null ? '—' : aprobado ? 'Aprobado' : 'Reprobado'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <p style={{ fontSize:'9px', color:'#9CA8B3', marginTop:'4px', fontStyle:'italic' }}>Aprueba con mínimo 50/100 · Cada competencia sobre 25 puntos</p>
+        </div>
+      )}
       <p style={{ textAlign:'center', fontSize:'9px', color:'#9CA8B3', marginTop:'20px' }}>
         Alliance Française Portoviejo · {new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'long', year:'numeric' })} · instituto-app-delta.vercel.app
       </p>
