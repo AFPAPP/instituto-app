@@ -9,22 +9,57 @@ export default async function DireccionPage() {
   const { data: me } = await supabase.from('profesores').select('rol').eq('user_id', user.id).single()
   if (me?.rol !== 'direccion') redirect('/profesor')
 
-  const [{ count: totalEst }, { count: cursosActivos }, { count: totalProfs }, { data: alertas }] = await Promise.all([
+  const [{ count: totalEst }, { count: cursosActivos }, { count: totalProfs }] = await Promise.all([
     supabase.from('estudiantes').select('*', { count: 'exact', head: true }).eq('retirado', false),
     supabase.from('modulos').select('*', { count: 'exact', head: true }).eq('estado', 'en_curso'),
     supabase.from('profesores').select('*', { count: 'exact', head: true }).eq('rol', 'profesor'),
-    supabase.from('vista_resumen').select('apellido, nombre, porcentaje_asistencia, nivel, modulo').lt('porcentaje_asistencia', 0.75).gt('porcentaje_asistencia', 0),
   ])
+
+  // Detectar inasistencias consecutivas (2 o más clases seguidas)
+  const alertasConsecutivas: { nombre: string; apellido: string; nivel: string; modulo: string; grupo: string; profesor: string; consecutivas: number; fechas: string[] }[] = []
+
+  const { data: modActivos } = await supabase.from('modulos').select('id, nivel, modulo, grupo, profesores(nombre)').eq('estado', 'en_curso')
+
+  for (const mod of modActivos || []) {
+    const { data: ests } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', mod.id).eq('retirado', false)
+    const { data: sesiones } = await supabase.from('sesiones').select('id, fecha').eq('modulo_id', mod.id).order('fecha')
+    if (!ests || !sesiones || sesiones.length < 2) continue
+
+    for (const est of ests) {
+      const { data: asis } = await supabase.from('asistencias').select('sesion_id, asistio').eq('estudiante_id', est.id).in('sesion_id', sesiones.map(s => s.id))
+      const asisMap = new Map(asis?.map(a => [a.sesion_id, a.asistio]) || [])
+
+      let consecutivas: string[] = []
+      let maxConsec = 0
+      let maxFechas: string[] = []
+
+      for (const ses of sesiones) {
+        if (asisMap.get(ses.id) === false) {
+          consecutivas.push(ses.fecha)
+          if (consecutivas.length > maxConsec) { maxConsec = consecutivas.length; maxFechas = [...consecutivas] }
+        } else { consecutivas = [] }
+      }
+
+      if (maxConsec >= 2) {
+        alertasConsecutivas.push({
+          apellido: est.apellido, nombre: est.nombre,
+          nivel: mod.nivel, modulo: mod.modulo, grupo: mod.grupo,
+          profesor: (mod.profesores as any)?.nombre || '—',
+          consecutivas: maxConsec, fechas: maxFechas,
+        })
+      }
+    }
+  }
 
   const { data: modulos } = await supabase
     .from('modulos').select('id, nivel, modulo, grupo, estado, profesores(nombre)')
     .in('estado', ['en_curso', 'por_iniciar']).order('estado')
 
   const metricas = [
-    { label: 'Estudiantes activos', val: totalEst || 0,        color: 'text-[#3E5C76]' },
-    { label: 'Cursos en curso',     val: cursosActivos || 0,   color: 'text-green-700' },
-    { label: 'Profesores',          val: totalProfs || 0,      color: 'text-[#3E5C76]' },
-    { label: 'Alertas asistencia',  val: alertas?.length || 0, color: alertas && alertas.length > 0 ? 'text-[#BC4A3C]' : 'text-green-700' },
+    { label: 'Estudiantes activos', val: totalEst || 0,       color: 'text-[#3E5C76]' },
+    { label: 'Cursos en curso',     val: cursosActivos || 0,  color: 'text-green-700' },
+    { label: 'Profesores',          val: totalProfs || 0,     color: 'text-[#3E5C76]' },
+    { label: 'Alertas asistencia',  val: alertasConsecutivas.length, color: alertasConsecutivas.length > 0 ? 'text-[#BC4A3C]' : 'text-green-700' },
   ]
 
   const accesos = [
@@ -51,21 +86,28 @@ export default async function DireccionPage() {
         ))}
       </div>
 
-      {alertas && alertas.length > 0 && (
+      {alertasConsecutivas.length > 0 && (
         <div className="card border-[#BC4A3C] border mb-6">
-          <h2 className="font-semibold text-[#BC4A3C] mb-3">⚠️ Alertas de baja asistencia (&lt;75%)</h2>
-          <div className="space-y-2">
-            {alertas.slice(0, 5).map((a, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="text-[#1a1a1a]">{a.apellido}, {a.nombre}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[#6B8294] text-xs">{a.nivel} {a.modulo}</span>
-                  <span className="badge-danger">{Math.round((a.porcentaje_asistencia || 0) * 100)}%</span>
+          <h2 className="font-semibold text-[#BC4A3C] mb-3">⚠️ Inasistencias consecutivas</h2>
+          <div className="space-y-3">
+            {alertasConsecutivas.slice(0, 5).map((a, i) => (
+              <div key={i} style={{ padding:'8px 12px', background:'#FEF2F2', borderRadius:'8px' }}>
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <div>
+                    <p className="font-medium text-sm text-[#1a1a1a]">{a.apellido}, {a.nombre}</p>
+                    <p className="text-xs text-[#6B8294]">{a.nivel} — {a.modulo} · {a.profesor}</p>
+                  </div>
+                  <span className="badge-danger">{a.consecutivas} clases seguidas</span>
                 </div>
+                <p className="text-xs text-[#BC4A3C] mt-1">
+                  Fechas: {a.fechas.map(f => new Date(f + 'T12:00:00').toLocaleDateString('es-EC', { day:'2-digit', month:'short' })).join(' · ')}
+                </p>
               </div>
             ))}
           </div>
-          <Link href="/direccion/resumen" className="text-xs text-[#3E5C76] hover:underline mt-2 block">Ver resumen completo →</Link>
+          <Link href="/direccion/notificaciones" className="text-xs text-[#3E5C76] hover:underline mt-3 block">
+            Ver todas las notificaciones →
+          </Link>
         </div>
       )}
 
