@@ -200,11 +200,12 @@ export default async function ImprimirModuloPage({ params }: { params: Promise<{
         Alliance Française Portoviejo · {new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'long', year:'numeric' })} · instituto-app-delta.vercel.app
       </p>
 
-      <style>{`
+            <style>{`
         @media print {
           .no-print { display: none !important; }
           body { background: white !important; margin: 0; padding: 0; }
           @page { margin: 1.5cm; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
     </div>
