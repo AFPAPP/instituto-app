@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-
+import PrintBtn from './PrintBtn'
 const MESES_ESP = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DIAS_SEMANA = ['Lu','Ma','Mi','Ju','Vi','Sá','Do']
 
@@ -74,9 +74,7 @@ export default async function ImprimirModuloPage({ params }: { params: Promise<{
 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }} className="no-print">
         <a href={`/direccion/modulos`} style={{ fontSize:'13px', color:'#3E5C76', textDecoration:'none' }}>← Volver a Módulos</a>
-        <a href="javascript:window.print()" style={{ padding:'8px 20px', background:'#3E5C76', color:'white', borderRadius:'8px', fontSize:'14px', fontWeight:500, textDecoration:'none', display:'inline-block' }}>
-          🖨️ Imprimir / Guardar PDF
-        </a>
+        <PrintBtn />
       </div>
 
       {/* ENCABEZADO */}
