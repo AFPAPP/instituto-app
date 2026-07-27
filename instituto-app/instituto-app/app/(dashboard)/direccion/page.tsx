@@ -22,7 +22,8 @@ export default async function DireccionPage() {
 
   for (const mod of modActivos || []) {
     const { data: ests } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', mod.id).eq('retirado', false)
-    const { data: sesiones } = await supabase.from('sesiones').select('id, fecha').eq('modulo_id', mod.id).order('fecha')
+       const hoy = new Date().toISOString().split('T')[0]
+    const { data: sesiones } = await supabase.from('sesiones').select('id, fecha').eq('modulo_id', mod.id).lte('fecha', hoy).order('fecha')
     if (!ests || !sesiones || sesiones.length < 2) continue
 
     for (const est of ests) {
