@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesores?:{nombre:string} }
-interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
+interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
 
 const ESTADOS_PAGO = ['pendiente','pagado','becado']
 const PAGO_BADGE: Record<string,string> = { pagado:'badge-success', pendiente:'badge-warning', becado:'badge-purple' }
 const PAGO_LABEL: Record<string,string> = { pagado:'Pagado', pendiente:'Pendiente', becado:'Becado' }
-const emptyEst = { modulo_id:'', apellido:'', nombre:'', descuento_pct:0, estado_pago:'pendiente' }
+const emptyEst = { modulo_id:'', apellido:'', nombre:'', codigo:'', descuento_pct:0, estado_pago:'pendiente' }
 
 export default function EstudiantesPage() {
   const supabase = createClient()
@@ -111,6 +111,8 @@ export default function EstudiantesPage() {
               <input className="input" placeholder="GARCIA LOPEZ" value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value.toUpperCase() }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Nombre(s)</label>
               <input className="input" placeholder="María" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} /></div>
+            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Código del estudiante</label>
+              <input className="input" placeholder="Ej: 543" value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">% Descuento</label>
               <input type="number" className="input" min="0" max="100" value={form.descuento_pct} onChange={e => setForm(f => ({ ...f, descuento_pct: Math.min(100, Math.max(0, parseInt(e.target.value)||0)) }))} /></div>
           </div>
@@ -130,7 +132,8 @@ export default function EstudiantesPage() {
                   <div className="w-9 h-9 rounded-full bg-[#3E5C76] text-[#FAF3E8] flex items-center justify-center text-xs font-semibold flex-shrink-0">{e.apellido[0]}{e.nombre[0]}</div>
                   <div>
                     <p className="font-medium text-sm text-[#1a1a1a]">{e.apellido}, {e.nombre}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {e.codigo && <span className="text-xs font-semibold text-[#3E5C76]">#{e.codigo}</span>}
                       <span className="text-xs text-[#9CA8B3]">{e.descuento_pct > 0 ? `${e.descuento_pct}% descuento` : 'Precio completo'}</span>
                       <span className={PAGO_BADGE[e.estado_pago]}>{PAGO_LABEL[e.estado_pago]}</span>
                     </div>
@@ -141,7 +144,7 @@ export default function EstudiantesPage() {
                     value={e.estado_pago} onChange={ev => actualizarPago(e.id, ev.target.value)}>
                     {ESTADOS_PAGO.map(ep => <option key={ep} value={ep}>{PAGO_LABEL[ep]}</option>)}
                   </select>
-                  <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
+                  <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, codigo:e.codigo||'', descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
                   <button onClick={() => { setRetiroId(e.id); setRetiroFecha(''); setRetiroMotivo('') }}
                     style={{ padding:'4px 10px', fontSize:'12px', background:'transparent', color:'#92400E', border:'1px solid #D97706', borderRadius:'8px', cursor:'pointer' }}>
                     Retirar
@@ -153,14 +156,10 @@ export default function EstudiantesPage() {
                 <div style={{ padding:'12px 16px', background:'#FFFBEB', borderTop:'0.5px solid #FDE68A' }}>
                   <p style={{ fontSize:'12px', fontWeight:500, color:'#92400E', marginBottom:'8px' }}>⚠️ Registrar retiro de {e.nombre} {e.apellido}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha de retiro *</label>
-                      <input type="date" className="input" value={retiroFecha} onChange={ev => setRetiroFecha(ev.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[#6B8294] mb-1">Motivo (opcional)</label>
-                      <input type="text" className="input" placeholder="Ej: Motivos personales" value={retiroMotivo} onChange={ev => setRetiroMotivo(ev.target.value)} />
-                    </div>
+                    <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha de retiro *</label>
+                      <input type="date" className="input" value={retiroFecha} onChange={ev => setRetiroFecha(ev.target.value)} /></div>
+                    <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Motivo (opcional)</label>
+                      <input type="text" className="input" placeholder="Ej: Motivos personales" value={retiroMotivo} onChange={ev => setRetiroMotivo(ev.target.value)} /></div>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => confirmarRetiro(e.id)} disabled={saving}
