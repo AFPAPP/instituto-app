@@ -8,7 +8,14 @@ const DIAS = ['Lu','Ma','Mi','Ju','Vi','Sá']
 const ESTADOS = ['por_iniciar','en_curso','finalizado','pausado']
 const ESTADO_LABEL: Record<string,string> = { por_iniciar:'Por iniciar', en_curso:'En curso', finalizado:'Finalizado', pausado:'Pausado' }
 const ESTADO_BADGE: Record<string,string> = { por_iniciar:'badge-warning', en_curso:'badge-success', finalizado:'badge-gray', pausado:'badge-danger' }
-
+const HORAS_MODULO: Record<string, number> = {
+  'A1-Módulo 1':60,'A1-Módulo 2':60,
+  'A2-Módulo 1':50,'A2-Módulo 2':50,'A2-Módulo 3':50,'A2-Módulo 4':50,
+  'B1-Módulo 1':80,'B1-Módulo 2':80,'B1-Módulo 3':80,
+  'B2-Módulo 1':90,'B2-Módulo 2':90,'B2-Módulo 3':90,
+  'C1-Módulo 1':80,'C1-Módulo 2':80,'C1-Módulo 3':80,'C1-Módulo 4':80,
+}
+const DIAS_NUM: Record<string,number> = { Lu:1,Ma:2,Mi:3,Ju:4,Vi:5,Sá:6,Sa:6 }
 interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; precio_mes:number; estado:string; profesores?:{nombre:string} }
 interface Profesor { id:string; nombre:string }
 
@@ -25,6 +32,7 @@ export default function ModulosPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [calculando, setCalculando] = useState(false)
   const [filtro, setFiltro] = useState<Filtro>('todos')
 
   async function load() {
@@ -63,7 +71,34 @@ export default function ModulosPage() {
     if (!confirm('¿Eliminar este módulo y todos sus datos?')) return
     await supabase.from('modulos').delete().eq('id', id); load()
   }
-
+async function calcularFechaFin() {
+  if (!form.fecha_inicio || form.dias.length === 0 || !form.horas_sesion) {
+    setMsg('Para calcular necesitas: fecha de inicio, días de clase y horas por sesión')
+    return
+  }
+  const key = `${form.nivel}-${form.modulo}`
+  const totalHoras = HORAS_MODULO[key]
+  if (!totalHoras) { setMsg('No hay horas definidas para este nivel/módulo'); return }
+  setCalculando(true)
+  const { data: feriadosData } = await supabase.from('feriados').select('fecha')
+  const feriadosSet = new Set(feriadosData?.map(f => f.fecha) || [])
+  const diasNums = form.dias.map(d => DIAS_NUM[d]).filter(n => n !== undefined)
+  const sesionesNecesarias = Math.ceil(totalHoras / form.horas_sesion)
+  let cur = new Date(form.fecha_inicio + 'T12:00:00')
+  const fechas: string[] = []
+  let intentos = 0
+  while (fechas.length < sesionesNecesarias && intentos < 500) {
+    const iso = cur.toISOString().split('T')[0]
+    if (diasNums.includes(cur.getDay()) && !feriadosSet.has(iso)) fechas.push(iso)
+    cur.setDate(cur.getDate() + 1)
+    intentos++
+  }
+  if (fechas.length === sesionesNecesarias) {
+    setForm(f => ({ ...f, fecha_fin: fechas[fechas.length - 1] }))
+    setMsg(`Calculado: ${sesionesNecesarias} sesiones de ${form.horas_sesion}h = ${totalHoras}h. Se saltaron ${feriadosSet.size > 0 ? 'los feriados registrados' : 'ningún feriado'}.`)
+  }
+  setCalculando(false)
+}
   const modulosFiltrados = filtro === 'todos' ? modulos : modulos.filter(m => m.estado === filtro)
   const activos = modulosFiltrados.filter(m => m.estado !== 'finalizado')
   const finalizados = modulosFiltrados.filter(m => m.estado === 'finalizado')
@@ -165,8 +200,14 @@ export default function ModulosPage() {
               <input type="number" className="input" min="1" max="10" value={form.horas_sesion} onChange={e => setForm(f => ({ ...f, horas_sesion: parseInt(e.target.value)||2 }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha inicio</label>
               <input type="date" className="input" value={form.fecha_inicio} onChange={e => setForm(f => ({ ...f, fecha_inicio: e.target.value }))} /></div>
-            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha fin</label>
-              <input type="date" className="input" value={form.fecha_fin} onChange={e => setForm(f => ({ ...f, fecha_fin: e.target.value }))} /></div>
+                       <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha fin</label>
+              <div style={{ display:'flex', gap:'6px' }}>
+                <input type="date" className="input" value={form.fecha_fin} onChange={e => setForm(f => ({ ...f, fecha_fin: e.target.value }))} />
+                <button type="button" onClick={calcularFechaFin} disabled={calculando}
+                  style={{ padding:'0 10px', fontSize:'11px', background:'#1B5E20', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
+                  {calculando ? '...' : '⚡ Auto'}
+                </button>
+              </div></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Precio/mes ($)</label>
               <input type="number" className="input" min="0" value={form.precio_mes} onChange={e => setForm(f => ({ ...f, precio_mes: parseFloat(e.target.value)||0 }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Estado</label>
