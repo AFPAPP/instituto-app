@@ -80,6 +80,7 @@ export default async function CursoPage({ params }: { params: Promise<{ id: stri
         <div className="flex gap-2 flex-wrap">
           <Link href={`/profesor/curso/${id}/asistencia`} className="btn-primary">Marcar asistencia</Link>
           <Link href={`/profesor/curso/${id}/notas`} className="btn-secondary">Notas finales</Link>
+          <Link href={`/profesor/curso/${id}/imprimir`} className="btn-secondary">🖨️ Imprimir reporte</Link>
         </div>
       </div>
 
