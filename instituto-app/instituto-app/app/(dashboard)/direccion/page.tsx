@@ -87,30 +87,7 @@ export default async function DireccionPage() {
         ))}
       </div>
 
-      {alertasConsecutivas.length > 0 && (
-        <div className="card border-[#BC4A3C] border mb-6">
-          <h2 className="font-semibold text-[#BC4A3C] mb-3">⚠️ Inasistencias consecutivas</h2>
-          <div className="space-y-3">
-            {alertasConsecutivas.slice(0, 5).map((a, i) => (
-              <div key={i} style={{ padding:'8px 12px', background:'#FEF2F2', borderRadius:'8px' }}>
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="font-medium text-sm text-[#1a1a1a]">{a.apellido}, {a.nombre}</p>
-                    <p className="text-xs text-[#6B8294]">{a.nivel} — {a.modulo} · {a.profesor}</p>
-                  </div>
-                  <span className="badge-danger">{a.consecutivas} clases seguidas</span>
-                </div>
-                <p className="text-xs text-[#BC4A3C] mt-1">
-                  Fechas: {a.fechas.map(f => new Date(f + 'T12:00:00').toLocaleDateString('es-EC', { day:'2-digit', month:'short' })).join(' · ')}
-                </p>
-              </div>
-            ))}
-          </div>
-          <Link href="/direccion/notificaciones" className="text-xs text-[#3E5C76] hover:underline mt-3 block">
-            Ver todas las notificaciones →
-          </Link>
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {accesos.map(l => (
