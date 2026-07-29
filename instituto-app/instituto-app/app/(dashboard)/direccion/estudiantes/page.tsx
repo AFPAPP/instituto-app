@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Modulo { id:string; nivel:string; modulo:string; grupo:string; estado:string; profesores?:{nombre:string} }
-interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
+interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; categoria_edad:string|null; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
 
 const ESTADOS_PAGO = ['pendiente','pagado','becado']
 const PAGO_BADGE: Record<string,string> = { pagado:'badge-success', pendiente:'badge-warning', becado:'badge-purple' }
 const PAGO_LABEL: Record<string,string> = { pagado:'Pagado', pendiente:'Pendiente', becado:'Becado' }
-const emptyEst = { modulo_id:'', apellido:'', nombre:'', codigo:'', descuento_pct:0, estado_pago:'pendiente' }
+const emptyEst = { modulo_id:'', apellido:'', nombre:'', codigo:'', categoria_edad:'adulto', descuento_pct:0, estado_pago:'pendiente' }
 
 export default function EstudiantesPage() {
   const supabase = createClient()
@@ -122,6 +122,12 @@ export default function EstudiantesPage() {
               <input className="input" placeholder="María" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Código del estudiante</label>
               <input className="input" placeholder="Ej: 543" value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} /></div>
+            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Categoría de edad</label>
+              <select className="input" value={form.categoria_edad} onChange={e => setForm(f => ({ ...f, categoria_edad: e.target.value }))}>
+                <option value="adulto">🧑 Adulto (18+)</option>
+                <option value="adolescente">👦 Adolescente (12-17)</option>
+                <option value="nino">👶 Niño (0-11)</option>
+              </select></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">% Descuento</label>
               <input type="number" className="input" min="0" max="100" value={form.descuento_pct} onChange={e => setForm(f => ({ ...f, descuento_pct: Math.min(100, Math.max(0, parseInt(e.target.value)||0)) }))} /></div>
           </div>
@@ -153,7 +159,7 @@ export default function EstudiantesPage() {
                     value={e.estado_pago} onChange={ev => actualizarPago(e.id, ev.target.value)}>
                     {ESTADOS_PAGO.map(ep => <option key={ep} value={ep}>{PAGO_LABEL[ep]}</option>)}
                   </select>
-                  <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, codigo:e.codigo||'', descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
+                 <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, codigo:e.codigo||'', categoria_edad:e.categoria_edad||'adulto', descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
                   <button onClick={() => { setRetiroId(e.id); setRetiroFecha(''); setRetiroMotivo('') }}
                     style={{ padding:'4px 10px', fontSize:'12px', background:'transparent', color:'#92400E', border:'1px solid #D97706', borderRadius:'8px', cursor:'pointer' }}>
                     Retirar
