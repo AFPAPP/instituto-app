@@ -38,6 +38,7 @@ export default function NavBar({ nombre, rol }: NavBarProps) {
     { href: '/direccion/reemplazos',    label: 'Reemplazos' },
     { href: '/direccion/estadisticas',  label: 'Estadísticas' },
      { href: '/direccion/inscripciones', label: 'Inscripciones' },
+     { href: '/direccion/reporte',       label: 'Reporte' },
     { href: '/direccion/usuarios',      label: 'Usuarios' },
   ]
   const links = rol === 'direccion' ? linksDireccion : linksProfesor
