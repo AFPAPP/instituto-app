@@ -22,54 +22,52 @@ export default async function ReportePage({ searchParams }: { searchParams: Prom
   const inicioAnio = `${anio}-01-01`
   const finAnio    = `${anio}-12-31`
 
-  // Módulos que iniciaron en el año seleccionado
   const { data: modulos } = await supabase
     .from('modulos')
-    .select('id, nivel, modalidad, tipo_grupo')
+    .select('id, nivel, modalidad, tipo_grupo, horas_sesion')
     .gte('fecha_inicio', inicioAnio)
     .lte('fecha_inicio', finAnio)
 
   const moduloIds = modulos?.map(m => m.id) || []
 
-  // Estudiantes de esos módulos
   const { data: estudiantes } = moduloIds.length > 0
-    ? await supabase.from('estudiantes').select('id, modulo_id, categoria_edad, retirado').in('modulo_id', moduloIds)
+    ? await supabase.from('estudiantes').select('id, modulo_id, categoria_edad, tipo_inscripcion, retirado').in('modulo_id', moduloIds)
     : { data: [] }
 
-  // Sesiones de esos módulos
   const { data: sesiones } = moduloIds.length > 0
     ? await supabase.from('sesiones').select('id, modulo_id').in('modulo_id', moduloIds).eq('cancelada', false)
     : { data: [] }
 
-  // Horas por sesión de cada módulo
-  const { data: modulosHoras } = await supabase.from('modulos').select('id, horas_sesion, nivel, modalidad, tipo_grupo').in('id', moduloIds)
-  const horasMap = new Map(modulosHoras?.map(m => [m.id, m.horas_sesion]) || [])
-  const nivelMap = new Map(modulosHoras?.map(m => [m.id, m.nivel]) || [])
-  const modalidadMap = new Map(modulosHoras?.map(m => [m.id, m.modalidad]) || [])
+  const horasMap = new Map(modulos?.map(m => [m.id, m.horas_sesion]) || [])
+  const nivelMap = new Map(modulos?.map(m => [m.id, m.nivel]) || [])
+  const modalidadMap = new Map(modulos?.map(m => [m.id, m.modalidad]) || [])
 
   const ests = estudiantes || []
   const sess = sesiones || []
 
-  // Estudiantes únicos
-  const estUnicosIds = new Set(ests.map(e => e.id))
-  const totalEst = estUnicosIds.size
+  // Totales generales
+  const totalInscripciones = ests.length
+  const primeraVez  = ests.filter(e => e.tipo_inscripcion === 'primera_vez' || !e.tipo_inscripcion)
+  const recurrentes = ests.filter(e => e.tipo_inscripcion === 'recurrente')
+  const totalApprenants = primeraVez.length
 
   // Por categoría de edad
   const adultos      = ests.filter(e => e.categoria_edad === 'adulto' || !e.categoria_edad)
   const adolescentes = ests.filter(e => e.categoria_edad === 'adolescente')
   const ninos        = ests.filter(e => e.categoria_edad === 'nino')
-  const ninosGrandes = ninos // 6-11 años (no tenemos subdivisión)
 
-  // Horas vendidas total (sesiones × horas × estudiantes por módulo)
+  // Horas vendidas
   let totalHorasVendidas = 0
   const horasPorNivel: Record<string, number> = {}
-  const estPorNivel: Record<string, Set<string>> = {}
   const inscPorNivel: Record<string, number> = {}
+  const primeraVezPorNivel: Record<string, number> = {}
+  const recurrentesPorNivel: Record<string, number> = {}
 
   NIVELES.forEach(n => {
     horasPorNivel[n] = 0
-    estPorNivel[n] = new Set()
     inscPorNivel[n] = 0
+    primeraVezPorNivel[n] = 0
+    recurrentesPorNivel[n] = 0
   })
 
   for (const ses of sess) {
@@ -83,18 +81,20 @@ export default async function ReportePage({ searchParams }: { searchParams: Prom
     }
   }
 
-  // Inscripciones y estudiantes por nivel
   for (const est of ests) {
     const nivel = nivelMap.get(est.modulo_id) || ''
-    if (nivel && estPorNivel[nivel]) {
-      estPorNivel[nivel].add(est.id)
+    if (nivel) {
       inscPorNivel[nivel] = (inscPorNivel[nivel] || 0) + 1
+      if (est.tipo_inscripcion === 'recurrente') {
+        recurrentesPorNivel[nivel] = (recurrentesPorNivel[nivel] || 0) + 1
+      } else {
+        primeraVezPorNivel[nivel] = (primeraVezPorNivel[nivel] || 0) + 1
+      }
     }
   }
 
-  // Modalidad virtual
-  const modulosVirtuales = modulos?.filter(m => m.modalidad === 'Virtual') || []
-  const modVirtualIds = modulosVirtuales.map(m => m.id)
+  // Virtual
+  const modVirtualIds = modulos?.filter(m => m.modalidad === 'Virtual').map(m => m.id) || []
   const estsVirtual = ests.filter(e => modVirtualIds.includes(e.modulo_id))
   const sesVirtual = sess.filter(s => modVirtualIds.includes(s.modulo_id))
   let horasVirtual = 0
@@ -104,20 +104,15 @@ export default async function ReportePage({ searchParams }: { searchParams: Prom
     horasVirtual += hSes * estsEnMod.length
   }
 
-  // Total inscripciones
-  const totalInscripciones = ests.length
-
-  // Recettes enseignement (horas vendidas × $5)
   const recettesEnsenanza = totalHorasVendidas * PRECIO_HORA
-
-  // Tarifa horaria en EUR (aproximado, tasa ~0.92)
   const tarifaHoraEUR = (PRECIO_HORA * 0.92).toFixed(2)
+  const anios = [2024, 2025, 2026, 2027]
 
-  function Fila({ num, label, valor, unidad = '', destacado = false }: { num: string; label: string; valor: string | number; unidad?: string; destacado?: boolean }) {
+  function Fila({ num, label, valor, unidad = '', destacado = false, sub = false }: { num: string; label: string; valor: string | number; unidad?: string; destacado?: boolean; sub?: boolean }) {
     return (
-      <div style={{ display:'flex', alignItems:'flex-start', gap:'12px', padding:'10px 0', borderBottom:'0.5px solid #E8DFCF', background: destacado ? '#F5F0E8' : 'transparent' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', gap:'12px', padding:'10px 0', borderBottom:'0.5px solid #E8DFCF', background: destacado ? '#F5F0E8' : 'transparent', paddingLeft: sub ? '16px' : '0' }}>
         <span style={{ fontSize:'11px', fontWeight:600, color:'#BC4A3C', minWidth:'40px', flexShrink:0, paddingTop:'2px' }}>{num}</span>
-        <span style={{ fontSize:'12px', color:'#6B8294', flex:1 }}>{label}</span>
+        <span style={{ fontSize:'12px', color: sub ? '#9CA8B3' : '#6B8294', flex:1 }}>{label}</span>
         <span style={{ fontSize:'14px', fontWeight:600, color:'#1E3A5F', minWidth:'120px', textAlign:'right' }}>
           {valor} <span style={{ fontSize:'11px', fontWeight:400, color:'#9CA8B3' }}>{unidad}</span>
         </span>
@@ -134,13 +129,11 @@ export default async function ReportePage({ searchParams }: { searchParams: Prom
     )
   }
 
-  const anios = [2024, 2025, 2026, 2027]
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#3E5C76]">Reporte Anual</h1>
+          <h1 className="text-2xl font-bold text-[#3E5C76]">Reporte Anual {anio}</h1>
           <p className="text-[#6B8294] text-sm mt-1">Datos para el cuestionario oficial de la Alliance Française</p>
         </div>
         <div style={{ display:'flex', gap:'6px' }}>
@@ -154,14 +147,17 @@ export default async function ReportePage({ searchParams }: { searchParams: Prom
       </div>
 
       <div style={{ background:'#E8F4FD', border:'1px solid #BFD9EF', borderRadius:'10px', padding:'12px 16px', marginBottom:'20px', fontSize:'12px', color:'#1E3A5F' }}>
-        ℹ️ Este reporte considera todos los módulos con <b>fecha de inicio en {anio}</b>. Las horas incluyen todas las sesiones del módulo aunque terminen en {anio+1}. Precio estándar para cálculo: <b>${PRECIO_HORA}/hora</b>.
+        ℹ️ Módulos con <b>fecha de inicio en {anio}</b>. Precio estándar: <b>${PRECIO_HORA}/hora</b>.
+        Las horas incluyen todas las sesiones del módulo completo aunque terminen en {anio+1}.
       </div>
 
       {/* PUNTO 2 */}
       <SeccionTitulo num="2" label="Activité d'enseignement — Cours de français grand public" />
       <div className="card">
-        <Fila num="2.2" label="Nombre total d'apprenants différents en cours de français" valor={totalEst} unidad="apprenants" />
-        <Fila num="2.7" label="...français langue seconde" valor={totalEst} unidad="apprenants" />
+        <Fila num="2.2" label="Nombre total d'apprenants différents (inscrits pour la première fois)" valor={totalApprenants} unidad="apprenants" destacado />
+        <Fila num="" label="↳ Inscrits récurrents (déjà étudiants avant)" valor={recurrentes.length} unidad="apprenants" sub />
+        <Fila num="" label="↳ Total inscriptions (première fois + récurrents)" valor={totalInscripciones} unidad="inscriptions" sub />
+        <Fila num="2.7" label="...français langue seconde" valor={totalApprenants} unidad="apprenants" />
         <Fila num="2.9" label="Nombre total d'heures-vendues" valor={totalHorasVendidas.toLocaleString()} unidad="heures" destacado />
         <Fila num="2.10" label="Heures dispensées en cours particuliers" valor={0} unidad="heures" />
         <Fila num="2.11" label="Nombre total d'inscriptions" valor={totalInscripciones} unidad="inscriptions" />
@@ -176,16 +172,17 @@ export default async function ReportePage({ searchParams }: { searchParams: Prom
         <div style={{ height:'8px' }} />
         <Fila num="3.13" label="Tarif horaire (en euro) — cours collectif adulte A1" valor={tarifaHoraEUR} unidad="EUR" destacado />
         <div style={{ height:'8px' }} />
-        <p style={{ fontSize:'11px', fontWeight:600, color:'#6B8294', margin:'8px 0 4px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Heures par niveau CECRL (adultos)</p>
-        <Fila num="3.14" label="A1" valor={HORAS_NIVEL['A1']} unidad="heures" />
-        <Fila num="3.15" label="A2" valor={HORAS_NIVEL['A2']} unidad="heures" />
-        <Fila num="3.16" label="B1" valor={HORAS_NIVEL['B1']} unidad="heures" />
-        <Fila num="3.17" label="B2" valor={HORAS_NIVEL['B2']} unidad="heures" />
-        <Fila num="3.18" label="C1" valor={HORAS_NIVEL['C1']} unidad="heures" />
-        <Fila num="3.19" label="C2" valor={HORAS_NIVEL['C2']} unidad="heures" />
+        <p style={{ fontSize:'11px', fontWeight:600, color:'#6B8294', margin:'8px 0 4px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Heures par niveau CECRL</p>
+        {NIVELES.map((n, i) => <Fila key={n} num={`3.${14+i}`} label={`${n}`} valor={HORAS_NIVEL[n]} unidad="heures" />)}
         <div style={{ height:'8px' }} />
         <p style={{ fontSize:'11px', fontWeight:600, color:'#6B8294', margin:'8px 0 4px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Inscriptions par niveau</p>
-        {NIVELES.map((n, i) => <Fila key={n} num={`3.${20+i}`} label={`Inscriptions ${n}`} valor={inscPorNivel[n] || 0} unidad="inscriptions" />)}
+        {NIVELES.map((n, i) => (
+          <div key={n}>
+            <Fila num={`3.${20+i}`} label={`Inscriptions ${n} (total)`} valor={inscPorNivel[n] || 0} unidad="inscriptions" />
+            <Fila num="" label={`↳ Première fois ${n}`} valor={primeraVezPorNivel[n] || 0} unidad="" sub />
+            <Fila num="" label={`↳ Récurrents ${n}`} valor={recurrentesPorNivel[n] || 0} unidad="" sub />
+          </div>
+        ))}
         <div style={{ height:'8px' }} />
         <p style={{ fontSize:'11px', fontWeight:600, color:'#6B8294', margin:'8px 0 4px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Heures vendues par niveau</p>
         {NIVELES.map((n, i) => <Fila key={n} num={`3.${26+i}`} label={`Heures vendues ${n}`} valor={Math.round(horasPorNivel[n] || 0)} unidad="heures" />)}
@@ -196,30 +193,29 @@ export default async function ReportePage({ searchParams }: { searchParams: Prom
       <div className="card">
         <p style={{ fontSize:'11px', fontWeight:600, color:'#6B8294', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Adultes</p>
         <Fila num="5.2" label="Nombre d'apprenants adultes (18 ans et plus)" valor={new Set(adultos.map(e=>e.id)).size} unidad="apprenants" />
-        <Fila num="5.3" label="Parmi les adultes, combien ont moins de 60 ans" valor={new Set(adultos.map(e=>e.id)).size} unidad="apprenants" />
-        <Fila num="5.4" label="Parmi les adultes, combien sont séniors (plus de 60 ans)" valor={0} unidad="apprenants" />
+        <Fila num="5.3" label="Parmi les adultes, moins de 60 ans" valor={new Set(adultos.map(e=>e.id)).size} unidad="apprenants" />
+        <Fila num="5.4" label="Parmi les adultes, séniors (plus de 60 ans)" valor={0} unidad="apprenants" />
         <div style={{ height:'8px' }} />
         <p style={{ fontSize:'11px', fontWeight:600, color:'#6B8294', margin:'8px 0 4px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Adolescents</p>
         <Fila num="5.6" label="Nombre d'apprenants adolescents (12 à 17 ans)" valor={new Set(adolescentes.map(e=>e.id)).size} unidad="apprenants" />
         <div style={{ height:'8px' }} />
         <p style={{ fontSize:'11px', fontWeight:600, color:'#6B8294', margin:'8px 0 4px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Enfants</p>
         <Fila num="5.8" label="Nombre d'apprenants enfants (0 à 11 ans)" valor={new Set(ninos.map(e=>e.id)).size} unidad="apprenants" />
-        <Fila num="5.9" label="Parmi les enfants, combien ont entre 6 et 11 ans" valor={new Set(ninosGrandes.map(e=>e.id)).size} unidad="apprenants" />
-        <Fila num="5.10" label="Parmi les enfants, combien ont moins de 6 ans" valor={0} unidad="apprenants" />
+        <Fila num="5.9" label="Entre 6 et 11 ans" valor={new Set(ninos.map(e=>e.id)).size} unidad="apprenants" />
+        <Fila num="5.10" label="Moins de 6 ans" valor={0} unidad="apprenants" />
       </div>
 
       {/* PUNTO 8 */}
-      <SeccionTitulo num="8.2" label="Bilan financier — Recettes issues de l'enseignement du français" />
+      <SeccionTitulo num="8.2" label="Bilan financier — Recettes de l'enseignement du français" />
       <div className="card">
-        <Fila num="8.2" label={`Recettes issues de l'enseignement du français (${totalHorasVendidas} h × $${PRECIO_HORA}/h)`} valor={`$${recettesEnsenanza.toLocaleString()}`} unidad="USD" destacado />
+        <Fila num="8.2" label={`${totalHorasVendidas} h × $${PRECIO_HORA}/h`} valor={`$${recettesEnsenanza.toLocaleString()}`} unidad="USD" destacado />
         <p style={{ fontSize:'11px', color:'#9CA8B3', marginTop:'8px' }}>
           Equivalente aproximado en EUR: €{(recettesEnsenanza * 0.92).toLocaleString('es-EC', { maximumFractionDigits:2 })} (tasa referencial 0.92)
         </p>
       </div>
 
       <div style={{ background:'#FEF3C7', border:'1px solid #FDE68A', borderRadius:'10px', padding:'12px 16px', marginTop:'20px', fontSize:'12px', color:'#92400E' }}>
-        ⚠️ Los campos marcados en amarillo requieren verificación manual antes de ingresar al formulario oficial.
-        Los puntos 2.3, 2.4, 2.5, 2.6, 2.8 y las distribuciones por edad y nivel (5.12-5.23) requieren datos adicionales no disponibles en el sistema.
+        ⚠️ Verifique los datos antes de ingresar al formulario oficial. Los puntos 5.12-5.23 (distribución por edad y nivel) requieren datos adicionales no disponibles en el sistema.
       </div>
 
       <style>{`@media print { nav, a[href], button { display:none !important; } body { background:white !important; } }`}</style>
