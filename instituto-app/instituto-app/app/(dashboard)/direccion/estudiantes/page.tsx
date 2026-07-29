@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Modulo { id:string; nivel:string; modulo:string; grupo:string; estado:string; profesores?:{nombre:string} }
-interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; categoria_edad:string|null; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
+interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; categoria_edad:string|null; tipo_inscripcion:string|null; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string} }
 
 const ESTADOS_PAGO = ['pendiente','pagado','becado']
 const PAGO_BADGE: Record<string,string> = { pagado:'badge-success', pendiente:'badge-warning', becado:'badge-purple' }
 const PAGO_LABEL: Record<string,string> = { pagado:'Pagado', pendiente:'Pendiente', becado:'Becado' }
-const emptyEst = { modulo_id:'', apellido:'', nombre:'', codigo:'', categoria_edad:'adulto', descuento_pct:0, estado_pago:'pendiente' }
+const emptyEst = { modulo_id:'', apellido:'', nombre:'', codigo:'', categoria_edad:'adulto', tipo_inscripcion:'primera_vez', descuento_pct:0, estado_pago:'pendiente' }
 
 export default function EstudiantesPage() {
   const supabase = createClient()
@@ -88,16 +88,16 @@ export default function EstudiantesPage() {
       <div className="card mb-4">
         <label className="block text-sm font-medium text-[#3E5C76] mb-2">Módulo</label>
         <select className="input" value={moduloSel} onChange={e => setModuloSel(e.target.value)}>
- <optgroup label="── Activos ──">
-          {modulos.filter(m => m.estado !== 'finalizado').map(m => (
-            <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre}</option>
-          ))}
-        </optgroup>
-        <optgroup label="── Finalizados ──">
-          {modulos.filter(m => m.estado === 'finalizado').map(m => (
-            <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre} [Finalizado]</option>
-          ))}
-        </optgroup>
+          <optgroup label="── Activos ──">
+            {modulos.filter(m => m.estado !== 'finalizado').map(m => (
+              <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre}</option>
+            ))}
+          </optgroup>
+          <optgroup label="── Finalizados ──">
+            {modulos.filter(m => m.estado === 'finalizado').map(m => (
+              <option key={m.id} value={m.id}>{m.nivel} — {m.modulo} ({m.grupo}) — {(m.profesores as {nombre:string}|null)?.nombre} [Finalizado]</option>
+            ))}
+          </optgroup>
         </select>
         {modActual && (
           <p className="text-xs text-[#9CA8B3] mt-1">
@@ -128,6 +128,11 @@ export default function EstudiantesPage() {
                 <option value="adolescente">👦 Adolescente (12-17)</option>
                 <option value="nino">👶 Niño (0-11)</option>
               </select></div>
+            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Tipo de inscripción</label>
+              <select className="input" value={form.tipo_inscripcion} onChange={e => setForm(f => ({ ...f, tipo_inscripcion: e.target.value }))}>
+                <option value="primera_vez">🆕 Primera vez en la AFP</option>
+                <option value="recurrente">🔄 Recurrente (ya estudió antes)</option>
+              </select></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">% Descuento</label>
               <input type="number" className="input" min="0" max="100" value={form.descuento_pct} onChange={e => setForm(f => ({ ...f, descuento_pct: Math.min(100, Math.max(0, parseInt(e.target.value)||0)) }))} /></div>
           </div>
@@ -151,6 +156,9 @@ export default function EstudiantesPage() {
                       {e.codigo && <span className="text-xs font-semibold text-[#3E5C76]">#{e.codigo}</span>}
                       <span className="text-xs text-[#9CA8B3]">{e.descuento_pct > 0 ? `${e.descuento_pct}% descuento` : 'Precio completo'}</span>
                       <span className={PAGO_BADGE[e.estado_pago]}>{PAGO_LABEL[e.estado_pago]}</span>
+                      <span style={{ fontSize:'11px', color: e.tipo_inscripcion === 'recurrente' ? '#5B21B6' : '#065F46', background: e.tipo_inscripcion === 'recurrente' ? '#EDE9FE' : '#D1FAE5', padding:'1px 6px', borderRadius:'4px' }}>
+                        {e.tipo_inscripcion === 'recurrente' ? '🔄 Recurrente' : '🆕 Primera vez'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -159,7 +167,7 @@ export default function EstudiantesPage() {
                     value={e.estado_pago} onChange={ev => actualizarPago(e.id, ev.target.value)}>
                     {ESTADOS_PAGO.map(ep => <option key={ep} value={ep}>{PAGO_LABEL[ep]}</option>)}
                   </select>
-                 <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, codigo:e.codigo||'', categoria_edad:e.categoria_edad||'adulto', descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
+                  <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, codigo:e.codigo||'', categoria_edad:e.categoria_edad||'adulto', tipo_inscripcion:e.tipo_inscripcion||'primera_vez', descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
                   <button onClick={() => { setRetiroId(e.id); setRetiroFecha(''); setRetiroMotivo('') }}
                     style={{ padding:'4px 10px', fontSize:'12px', background:'transparent', color:'#92400E', border:'1px solid #D97706', borderRadius:'8px', cursor:'pointer' }}>
                     Retirar
