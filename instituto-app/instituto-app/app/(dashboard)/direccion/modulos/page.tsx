@@ -8,18 +8,21 @@ const DIAS = ['Lu','Ma','Mi','Ju','Vi','Sá']
 const ESTADOS = ['por_iniciar','en_curso','finalizado','pausado']
 const ESTADO_LABEL: Record<string,string> = { por_iniciar:'Por iniciar', en_curso:'En curso', finalizado:'Finalizado', pausado:'Pausado' }
 const ESTADO_BADGE: Record<string,string> = { por_iniciar:'badge-warning', en_curso:'badge-success', finalizado:'badge-gray', pausado:'badge-danger' }
-const HORAS_MODULO: Record<string, number> = {
+
+const HORAS_ADULTOS: Record<string, number> = {
   'A1-Módulo 1':60,'A1-Módulo 2':60,
   'A2-Módulo 1':50,'A2-Módulo 2':50,'A2-Módulo 3':50,'A2-Módulo 4':50,
   'B1-Módulo 1':80,'B1-Módulo 2':80,'B1-Módulo 3':80,
   'B2-Módulo 1':90,'B2-Módulo 2':90,'B2-Módulo 3':90,
   'C1-Módulo 1':80,'C1-Módulo 2':80,'C1-Módulo 3':80,'C1-Módulo 4':80,
 }
+const HORAS_ADOLESCENTES = 104
 const DIAS_NUM: Record<string,number> = { Lu:1,Ma:2,Mi:3,Ju:4,Vi:5,Sá:6,Sa:6 }
-interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; precio_mes:number; estado:string; profesores?:{nombre:string} }
+
+interface Modulo { id:string; nivel:string; modulo:string; grupo:string; tipo_grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; precio_mes:number; estado:string; profesores?:{nombre:string} }
 interface Profesor { id:string; nombre:string }
 
-const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar' }
+const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', tipo_grupo:'adultos', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar' }
 
 type Filtro = 'todos' | 'en_curso' | 'por_iniciar' | 'finalizado' | 'pausado'
 
@@ -32,8 +35,8 @@ export default function ModulosPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
-  const [calculando, setCalculando] = useState(false)
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [calculando, setCalculando] = useState(false)
 
   async function load() {
     const { data } = await supabase.from('modulos').select('*, profesores(nombre)').order('nivel').order('modulo')
@@ -62,7 +65,7 @@ export default function ModulosPage() {
   }
 
   function editar(m: Modulo) {
-    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado })
+    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado })
     setEditId(m.id); setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -71,34 +74,41 @@ export default function ModulosPage() {
     if (!confirm('¿Eliminar este módulo y todos sus datos?')) return
     await supabase.from('modulos').delete().eq('id', id); load()
   }
-async function calcularFechaFin() {
-  if (!form.fecha_inicio || form.dias.length === 0 || !form.horas_sesion) {
-    setMsg('Para calcular necesitas: fecha de inicio, días de clase y horas por sesión')
-    return
+
+  async function calcularFechaFin() {
+    if (!form.fecha_inicio || form.dias.length === 0 || !form.horas_sesion) {
+      setMsg('Para calcular necesitas: fecha de inicio, días de clase y horas por sesión')
+      return
+    }
+    let totalHoras: number
+    if (form.tipo_grupo === 'adolescentes') {
+      totalHoras = HORAS_ADOLESCENTES
+    } else {
+      const key = `${form.nivel}-${form.modulo}`
+      totalHoras = HORAS_ADULTOS[key]
+      if (!totalHoras) { setMsg('No hay horas definidas para este nivel/módulo'); return }
+    }
+    setCalculando(true)
+    const { data: feriadosData } = await supabase.from('feriados').select('fecha')
+    const feriadosSet = new Set(feriadosData?.map(f => f.fecha) || [])
+    const diasNums = form.dias.map(d => DIAS_NUM[d]).filter(n => n !== undefined)
+    const sesionesNecesarias = Math.ceil(totalHoras / form.horas_sesion)
+    let cur = new Date(form.fecha_inicio + 'T12:00:00')
+    const fechas: string[] = []
+    let intentos = 0
+    while (fechas.length < sesionesNecesarias && intentos < 500) {
+      const iso = cur.toISOString().split('T')[0]
+      if (diasNums.includes(cur.getDay()) && !feriadosSet.has(iso)) fechas.push(iso)
+      cur.setDate(cur.getDate() + 1)
+      intentos++
+    }
+    if (fechas.length === sesionesNecesarias) {
+      setForm(f => ({ ...f, fecha_fin: fechas[fechas.length - 1] }))
+      setMsg(`✅ ${sesionesNecesarias} sesiones × ${form.horas_sesion}h = ${totalHoras}h ${form.tipo_grupo === 'adolescentes' ? '(Adolescentes)' : '(Adultos)'}. Feriados saltados automáticamente.`)
+    }
+    setCalculando(false)
   }
-  const key = `${form.nivel}-${form.modulo}`
-  const totalHoras = HORAS_MODULO[key]
-  if (!totalHoras) { setMsg('No hay horas definidas para este nivel/módulo'); return }
-  setCalculando(true)
-  const { data: feriadosData } = await supabase.from('feriados').select('fecha')
-  const feriadosSet = new Set(feriadosData?.map(f => f.fecha) || [])
-  const diasNums = form.dias.map(d => DIAS_NUM[d]).filter(n => n !== undefined)
-  const sesionesNecesarias = Math.ceil(totalHoras / form.horas_sesion)
-  let cur = new Date(form.fecha_inicio + 'T12:00:00')
-  const fechas: string[] = []
-  let intentos = 0
-  while (fechas.length < sesionesNecesarias && intentos < 500) {
-    const iso = cur.toISOString().split('T')[0]
-    if (diasNums.includes(cur.getDay()) && !feriadosSet.has(iso)) fechas.push(iso)
-    cur.setDate(cur.getDate() + 1)
-    intentos++
-  }
-  if (fechas.length === sesionesNecesarias) {
-    setForm(f => ({ ...f, fecha_fin: fechas[fechas.length - 1] }))
-    setMsg(`Calculado: ${sesionesNecesarias} sesiones de ${form.horas_sesion}h = ${totalHoras}h. Se saltaron ${feriadosSet.size > 0 ? 'los feriados registrados' : 'ningún feriado'}.`)
-  }
-  setCalculando(false)
-}
+
   const modulosFiltrados = filtro === 'todos' ? modulos : modulos.filter(m => m.estado === filtro)
   const activos = modulosFiltrados.filter(m => m.estado !== 'finalizado')
   const finalizados = modulosFiltrados.filter(m => m.estado === 'finalizado')
@@ -123,6 +133,9 @@ async function calcularFechaFin() {
               <span style={{ fontWeight:500, fontSize:'14px', color:'#1a1a1a' }}>{m.nivel} — {m.modulo}</span>
               <span style={{ fontSize:'12px', color:'#9CA8B3' }}>{m.grupo}</span>
               <span className={ESTADO_BADGE[m.estado]}>{ESTADO_LABEL[m.estado]}</span>
+              <span style={{ fontSize:'11px', padding:'1px 7px', borderRadius:'4px', background: m.tipo_grupo === 'adolescentes' ? '#DBEAFE' : '#F0FDF4', color: m.tipo_grupo === 'adolescentes' ? '#1E40AF' : '#166534', fontWeight:500 }}>
+                {m.tipo_grupo === 'adolescentes' ? '👦 Adolescentes' : '🧑 Adultos'}
+              </span>
             </div>
             <div style={{ display:'flex', gap:'6px', marginTop:'4px', fontSize:'12px', color:'#9CA8B3', flexWrap:'wrap', alignItems:'center' }}>
               <span>{(m.profesores as {nombre:string}|null)?.nombre}</span>
@@ -133,35 +146,15 @@ async function calcularFechaFin() {
               <span>·</span><span>${m.precio_mes}/mes</span>
             </div>
             <div style={{ display:'flex', gap:'8px', marginTop:'4px', flexWrap:'wrap' }}>
-              {m.fecha_examen_modulo && (
-                <span style={{ fontSize:'11px', background:'#EDE9FE', color:'#5B21B6', padding:'1px 7px', borderRadius:'4px' }}>
-                  📝 Examen módulo: {m.fecha_examen_modulo}
-                </span>
-              )}
-              {m.fecha_examen_nivel && (
-                <span style={{ fontSize:'11px', background:'#FEF3C7', color:'#92400E', padding:'1px 7px', borderRadius:'4px' }}>
-                  🎓 Examen nivel: {m.fecha_examen_nivel}
-                </span>
-              )}
+              {m.fecha_examen_modulo && <span style={{ fontSize:'11px', background:'#EDE9FE', color:'#5B21B6', padding:'1px 7px', borderRadius:'4px' }}>📝 Examen módulo: {m.fecha_examen_modulo}</span>}
+              {m.fecha_examen_nivel && <span style={{ fontSize:'11px', background:'#FEF3C7', color:'#92400E', padding:'1px 7px', borderRadius:'4px' }}>🎓 Examen nivel: {m.fecha_examen_nivel}</span>}
             </div>
           </div>
           <div style={{ display:'flex', gap:'6px', flexShrink:0, alignItems:'center' }}>
-           <a href={`/direccion/modulos/${m.id}/imprimir`}
-              style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#1B5E20', border:'1px solid #1B5E20', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>
-              🖨️
-            </a>
-            <a href={`/direccion/modulos/${m.id}`}
-              style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#5B21B6', border:'1px solid #5B21B6', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>
-              Sesiones
-            </a>
-            <button onClick={() => editar(m)}
-              style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#3E5C76', border:'1px solid #3E5C76', borderRadius:'8px', cursor:'pointer' }}>
-              Editar
-            </button>
-            <button onClick={() => eliminar(m.id)}
-              style={{ padding:'4px 12px', fontSize:'12px', background:'#BC4A3C', color:'white', border:'none', borderRadius:'8px', cursor:'pointer' }}>
-              ✕
-            </button>
+            <a href={`/direccion/modulos/${m.id}/imprimir`} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#1B5E20', border:'1px solid #1B5E20', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>🖨️</a>
+            <a href={`/direccion/modulos/${m.id}`} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#5B21B6', border:'1px solid #5B21B6', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>Sesiones</a>
+            <button onClick={() => editar(m)} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#3E5C76', border:'1px solid #3E5C76', borderRadius:'8px', cursor:'pointer' }}>Editar</button>
+            <button onClick={() => eliminar(m.id)} style={{ padding:'4px 12px', fontSize:'12px', background:'#BC4A3C', color:'white', border:'none', borderRadius:'8px', cursor:'pointer' }}>✕</button>
           </div>
         </div>
       </div>
@@ -178,6 +171,25 @@ async function calcularFechaFin() {
       {showForm && (
         <div className="card mb-6">
           <h2 className="font-semibold text-[#3E5C76] mb-4">{editId ? 'Editar módulo' : 'Nuevo módulo'}</h2>
+
+          {/* Tipo de grupo */}
+          <div style={{ marginBottom:'16px', padding:'12px', background:'#F0F9FF', borderRadius:'8px', border:'0.5px solid #BAE6FD' }}>
+            <p style={{ fontSize:'12px', fontWeight:500, color:'#0369A1', marginBottom:'8px' }}>Tipo de grupo</p>
+            <div style={{ display:'flex', gap:'10px' }}>
+              <button type="button" onClick={() => setForm(f => ({ ...f, tipo_grupo:'adultos' }))}
+                style={{ flex:1, padding:'10px', borderRadius:'8px', border:'1.5px solid', cursor:'pointer', transition:'all 0.15s', background: form.tipo_grupo === 'adultos' ? '#3E5C76' : 'white', color: form.tipo_grupo === 'adultos' ? 'white' : '#6B8294', borderColor: form.tipo_grupo === 'adultos' ? '#3E5C76' : '#E8DFCF', fontSize:'13px', fontWeight:500 }}>
+                🧑 Adultos
+              </button>
+              <button type="button" onClick={() => setForm(f => ({ ...f, tipo_grupo:'adolescentes' }))}
+                style={{ flex:1, padding:'10px', borderRadius:'8px', border:'1.5px solid', cursor:'pointer', transition:'all 0.15s', background: form.tipo_grupo === 'adolescentes' ? '#1E40AF' : 'white', color: form.tipo_grupo === 'adolescentes' ? 'white' : '#6B8294', borderColor: form.tipo_grupo === 'adolescentes' ? '#1E40AF' : '#E8DFCF', fontSize:'13px', fontWeight:500 }}>
+                👦 Adolescentes
+              </button>
+            </div>
+            <p style={{ fontSize:'11px', color:'#0369A1', marginTop:'6px' }}>
+              {form.tipo_grupo === 'adolescentes' ? '📚 Adolescentes: 104h por nivel (calculado automáticamente)' : '📚 Adultos: horas variables según nivel y módulo'}
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Nivel</label>
               <select className="input" value={form.nivel} onChange={e => setForm(f => ({ ...f, nivel: e.target.value }))}>
@@ -185,7 +197,7 @@ async function calcularFechaFin() {
               </select></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Módulo</label>
               <input className="input" value={form.modulo} onChange={e => setForm(f => ({ ...f, modulo: e.target.value }))} /></div>
-            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Grupo *</label>
+            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Nombre del grupo *</label>
               <input className="input" placeholder="Ej: A2-M1-2026" value={form.grupo} onChange={e => setForm(f => ({ ...f, grupo: e.target.value }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Profesor *</label>
               <select className="input" value={form.profesor_id} onChange={e => setForm(f => ({ ...f, profesor_id: e.target.value }))}>
@@ -200,7 +212,7 @@ async function calcularFechaFin() {
               <input type="number" className="input" min="1" max="10" value={form.horas_sesion} onChange={e => setForm(f => ({ ...f, horas_sesion: parseInt(e.target.value)||2 }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha inicio</label>
               <input type="date" className="input" value={form.fecha_inicio} onChange={e => setForm(f => ({ ...f, fecha_inicio: e.target.value }))} /></div>
-                       <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha fin</label>
+            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha fin</label>
               <div style={{ display:'flex', gap:'6px' }}>
                 <input type="date" className="input" value={form.fecha_fin} onChange={e => setForm(f => ({ ...f, fecha_fin: e.target.value }))} />
                 <button type="button" onClick={calcularFechaFin} disabled={calculando}
@@ -215,6 +227,7 @@ async function calcularFechaFin() {
                 {ESTADOS.map(s => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
               </select></div>
           </div>
+
           <div style={{ marginTop:'16px', padding:'12px', background:'#F5F0E8', borderRadius:'8px', border:'0.5px solid #E8DFCF' }}>
             <p style={{ fontSize:'12px', fontWeight:500, color:'#3E5C76', marginBottom:'10px' }}>📅 Fechas especiales (opcionales)</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -223,14 +236,14 @@ async function calcularFechaFin() {
               <div><label className="block text-xs font-medium text-[#6B8294] mb-1">🎓 Examen final de nivel</label>
                 <input type="date" className="input" value={form.fecha_examen_nivel} onChange={e => setForm(f => ({ ...f, fecha_examen_nivel: e.target.value }))} /></div>
             </div>
-            <p style={{ fontSize:'11px', color:'#9CA8B3', marginTop:'6px' }}>Estas fechas aparecen destacadas en el calendario del profesor.</p>
           </div>
+
           <div className="mt-3"><label className="block text-xs font-medium text-[#6B8294] mb-2">Días de clase</label>
             <div className="flex gap-2 flex-wrap">
               {DIAS.map(d => <button key={d} type="button" onClick={() => toggleDia(d)}
                 style={{ padding:'4px 12px', fontSize:'13px', borderRadius:'8px', border:'1px solid', cursor:'pointer', background: form.dias.includes(d) ? '#3E5C76' : 'transparent', color: form.dias.includes(d) ? 'white' : '#6B8294', borderColor: form.dias.includes(d) ? '#3E5C76' : '#E8DFCF' }}>{d}</button>)}
             </div></div>
-          {msg && <p className="text-[#BC4A3C] text-sm mt-2">{msg}</p>}
+          {msg && <p className="text-sm mt-2" style={{ color: msg.startsWith('✅') ? '#1B5E20' : '#BC4A3C' }}>{msg}</p>}
           <div className="flex gap-2 mt-4">
             <button onClick={guardar} disabled={saving} className="btn-primary">{saving ? 'Guardando...' : 'Guardar'}</button>
             <button onClick={() => { setShowForm(false); setEditId(null) }} className="btn-secondary">Cancelar</button>
