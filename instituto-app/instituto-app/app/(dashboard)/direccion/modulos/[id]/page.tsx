@@ -10,6 +10,7 @@ interface Sesion {
   cancelada: boolean
   motivo_cancelacion: string | null
   profesor_reemplazo_id: string | null
+  profesor_reemplazo_externo: string | null
   profesores_reemplazo?: { nombre: string } | null
 }
 interface Profesor { id: string; nombre: string }
@@ -27,6 +28,8 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
   const [editando, setEditando] = useState<string | null>(null)
   const [formCancel, setFormCancel] = useState('')
   const [formReemplazo, setFormReemplazo] = useState('')
+  const [formReemplazoExterno, setFormReemplazoExterno] = useState('')
+  const [tipoReemplazo, setTipoReemplazo] = useState<'interno' | 'externo'>('interno')
   const [saving, setSaving] = useState(false)
   const [filtro, setFiltro] = useState<'todas' | 'canceladas' | 'reemplazos'>('todas')
 
@@ -35,7 +38,7 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
     setModulo(mod)
     const { data: ses } = await supabase
       .from('sesiones')
-      .select('id, fecha, numero_clase, cancelada, motivo_cancelacion, profesor_reemplazo_id, profesores_reemplazo:profesor_reemplazo_id(nombre)')
+      .select('id, fecha, numero_clase, cancelada, motivo_cancelacion, profesor_reemplazo_id, profesor_reemplazo_externo, profesores_reemplazo:profesor_reemplazo_id(nombre)')
       .eq('modulo_id', id)
       .order('fecha')
     setSesiones(((ses as unknown) as Sesion[]) || [])
@@ -49,15 +52,27 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
     setEditando(s.id)
     setFormCancel(s.motivo_cancelacion || '')
     setFormReemplazo(s.profesor_reemplazo_id || '')
+    setFormReemplazoExterno(s.profesor_reemplazo_externo || '')
+    setTipoReemplazo(s.profesor_reemplazo_externo ? 'externo' : 'interno')
   }
 
   async function guardar(sesId: string, cancelar: boolean) {
     setSaving(true)
-    await supabase.from('sesiones').update({
-      cancelada: cancelar,
-      motivo_cancelacion: cancelar ? (formCancel || null) : null,
-      profesor_reemplazo_id: !cancelar && formReemplazo ? formReemplazo : null,
-    }).eq('id', sesId)
+    if (cancelar) {
+      await supabase.from('sesiones').update({
+        cancelada: true,
+        motivo_cancelacion: formCancel || null,
+        profesor_reemplazo_id: null,
+        profesor_reemplazo_externo: null,
+      }).eq('id', sesId)
+    } else {
+      await supabase.from('sesiones').update({
+        cancelada: false,
+        motivo_cancelacion: null,
+        profesor_reemplazo_id: tipoReemplazo === 'interno' ? formReemplazo || null : null,
+        profesor_reemplazo_externo: tipoReemplazo === 'externo' ? formReemplazoExterno || null : null,
+      }).eq('id', sesId)
+    }
     setEditando(null)
     setSaving(false)
     load()
@@ -65,19 +80,19 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
 
   async function limpiar(sesId: string) {
     setSaving(true)
-    await supabase.from('sesiones').update({ cancelada: false, motivo_cancelacion: null, profesor_reemplazo_id: null }).eq('id', sesId)
+    await supabase.from('sesiones').update({ cancelada: false, motivo_cancelacion: null, profesor_reemplazo_id: null, profesor_reemplazo_externo: null }).eq('id', sesId)
     setSaving(false)
     load()
   }
 
   const filtradas = sesiones.filter(s => {
     if (filtro === 'canceladas') return s.cancelada
-    if (filtro === 'reemplazos') return s.profesor_reemplazo_id && !s.cancelada
+    if (filtro === 'reemplazos') return (s.profesor_reemplazo_id || s.profesor_reemplazo_externo) && !s.cancelada
     return true
   })
 
   const totalCanceladas = sesiones.filter(s => s.cancelada).length
-  const totalReemplazos = sesiones.filter(s => s.profesor_reemplazo_id && !s.cancelada).length
+  const totalReemplazos = sesiones.filter(s => (s.profesor_reemplazo_id || s.profesor_reemplazo_externo) && !s.cancelada).length
 
   return (
     <div>
@@ -127,8 +142,9 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
           {filtradas.map(s => {
             const fecha = new Date(s.fecha + 'T12:00:00')
             const esCancelada = s.cancelada
-            const tieneReemplazo = s.profesor_reemplazo_id && !s.cancelada
-            const reemplazaNombre = (s.profesores_reemplazo as {nombre:string}|null)?.nombre
+            const tieneReemplazo = (s.profesor_reemplazo_id || s.profesor_reemplazo_externo) && !s.cancelada
+            const reemplazaNombre = s.profesor_reemplazo_externo || (s.profesores_reemplazo as {nombre:string}|null)?.nombre
+            const esExterno = !!s.profesor_reemplazo_externo
 
             return (
               <div key={s.id} style={{ padding:'12px 16px', background: esCancelada ? '#FFF5F5' : tieneReemplazo ? '#F5F0FF' : 'white' }}>
@@ -141,6 +157,7 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
                       <p style={{ fontSize:'10px', color:'#9CA8B3', margin:0 }}>{DIAS_ESP[fecha.getDay()]}</p>
                       <p style={{ fontSize:'9px', color:'#9CA8B3', margin:0 }}>{MESES_ESP[fecha.getMonth()].slice(0,3)}</p>
                     </div>
+
                     <div style={{ flex:1 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
                         <span style={{ fontSize:'13px', fontWeight:500, color: esCancelada ? '#9CA8B3' : '#1a1a1a', textDecoration: esCancelada ? 'line-through' : 'none' }}>
@@ -148,15 +165,19 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
                         </span>
                         {esCancelada && <span className="badge-danger">Cancelada</span>}
                         {tieneReemplazo && <span className="badge-purple">Reemplazo</span>}
+                        {tieneReemplazo && esExterno && <span className="badge-info">Externo</span>}
                       </div>
                       {esCancelada && s.motivo_cancelacion && (
                         <p style={{ fontSize:'11px', color:'#BC4A3C', margin:'2px 0 0' }}>Motivo: {s.motivo_cancelacion}</p>
                       )}
                       {tieneReemplazo && reemplazaNombre && (
-                        <p style={{ fontSize:'11px', color:'#5B21B6', margin:'2px 0 0' }}>Reemplazó: {reemplazaNombre}</p>
+                        <p style={{ fontSize:'11px', color:'#5B21B6', margin:'2px 0 0' }}>
+                          Reemplazó: {reemplazaNombre} {esExterno ? '(externo)' : ''}
+                        </p>
                       )}
                     </div>
                   </div>
+
                   <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
                     {(esCancelada || tieneReemplazo) && (
                       <button onClick={() => limpiar(s.id)} style={{ padding:'4px 10px', fontSize:'11px', background:'transparent', color:'#9CA8B3', border:'1px solid #E8DFCF', borderRadius:'6px', cursor:'pointer' }}>
@@ -184,13 +205,29 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
                       </div>
                       <div>
                         <p style={{ fontSize:'12px', fontWeight:500, color:'#5B21B6', marginBottom:'6px' }}>👤 Registrar reemplazo</p>
-                        <select className="input" style={{ marginBottom:'6px', fontSize:'12px' }}
-                          value={formReemplazo} onChange={e => setFormReemplazo(e.target.value)}>
-                          <option value="">-- Selecciona profesor --</option>
-                          {profesores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                        <button onClick={() => guardar(s.id, false)} disabled={saving || !formReemplazo}
-                          style={{ padding:'5px 12px', fontSize:'12px', background: formReemplazo ? '#5B21B6' : '#E8DFCF', color: formReemplazo ? 'white' : '#9CA8B3', border:'none', borderRadius:'6px', cursor: formReemplazo ? 'pointer' : 'not-allowed', width:'100%' }}>
+                        <div style={{ display:'flex', gap:'6px', marginBottom:'6px' }}>
+                          <button type="button" onClick={() => setTipoReemplazo('interno')}
+                            style={{ flex:1, padding:'4px', fontSize:'11px', borderRadius:'6px', border:'1px solid', cursor:'pointer', background: tipoReemplazo === 'interno' ? '#5B21B6' : 'white', color: tipoReemplazo === 'interno' ? 'white' : '#6B8294', borderColor: tipoReemplazo === 'interno' ? '#5B21B6' : '#E8DFCF' }}>
+                            Del sistema
+                          </button>
+                          <button type="button" onClick={() => setTipoReemplazo('externo')}
+                            style={{ flex:1, padding:'4px', fontSize:'11px', borderRadius:'6px', border:'1px solid', cursor:'pointer', background: tipoReemplazo === 'externo' ? '#1E40AF' : 'white', color: tipoReemplazo === 'externo' ? 'white' : '#6B8294', borderColor: tipoReemplazo === 'externo' ? '#1E40AF' : '#E8DFCF' }}>
+                            Externo
+                          </button>
+                        </div>
+                        {tipoReemplazo === 'interno' ? (
+                          <select className="input" style={{ marginBottom:'6px', fontSize:'12px' }}
+                            value={formReemplazo} onChange={e => setFormReemplazo(e.target.value)}>
+                            <option value="">-- Selecciona profesor --</option>
+                            {profesores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                          </select>
+                        ) : (
+                          <input type="text" placeholder="Nombre del profesor externo" className="input" style={{ marginBottom:'6px', fontSize:'12px' }}
+                            value={formReemplazoExterno} onChange={e => setFormReemplazoExterno(e.target.value)} />
+                        )}
+                        <button onClick={() => guardar(s.id, false)}
+                          disabled={saving || (tipoReemplazo === 'interno' ? !formReemplazo : !formReemplazoExterno)}
+                          style={{ padding:'5px 12px', fontSize:'12px', background: (tipoReemplazo === 'interno' ? formReemplazo : formReemplazoExterno) ? '#5B21B6' : '#E8DFCF', color: (tipoReemplazo === 'interno' ? formReemplazo : formReemplazoExterno) ? 'white' : '#9CA8B3', border:'none', borderRadius:'6px', cursor: 'pointer', width:'100%' }}>
                           {saving ? 'Guardando...' : 'Confirmar reemplazo'}
                         </button>
                       </div>
