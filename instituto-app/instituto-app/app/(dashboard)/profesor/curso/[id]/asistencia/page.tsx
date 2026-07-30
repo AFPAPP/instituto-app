@@ -16,8 +16,8 @@ export default function AsistenciaPage({ params }: { params: Promise<{ id: strin
   const [sesionSel, setSesionSel] = useState<string>('')
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([])
   const [asistencias, setAsistencias] = useState<AsistenciaMap>({})
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [guardando, setGuardando] = useState<string | null>(null)
+  const [ultimoGuardado, setUltimoGuardado] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -29,7 +29,7 @@ export default function AsistenciaPage({ params }: { params: Promise<{ id: strin
       const hoyS = ses?.find(s => s.fecha === hoy)
       const ultima = ses?.[ses.length - 1]
       setSesionSel(hoyS?.id || ultima?.id || ses?.[0]?.id || '')
-      const { data: est } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', id).order('apellido')
+      const { data: est } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', id).eq('retirado', false).order('apellido')
       setEstudiantes(est || [])
     }
     load()
@@ -47,21 +47,32 @@ export default function AsistenciaPage({ params }: { params: Promise<{ id: strin
     loadAsist()
   }, [sesionSel, estudiantes])
 
-  function toggle(estId: string) {
-    setAsistencias(prev => ({ ...prev, [estId]: !prev[estId] }))
-    setSaved(false)
+  async function toggle(estId: string) {
+    const nuevoValor = !asistencias[estId]
+    setAsistencias(prev => ({ ...prev, [estId]: nuevoValor }))
+    setGuardando(estId)
+    await supabase.from('asistencias').upsert({
+      sesion_id: sesionSel,
+      estudiante_id: estId,
+      asistio: nuevoValor,
+    }, { onConflict: 'sesion_id,estudiante_id' })
+    setGuardando(null)
+    setUltimoGuardado(estId)
+    setTimeout(() => setUltimoGuardado(null), 2000)
   }
 
-  async function guardar() {
-    setSaving(true)
+  async function marcarTodos() {
+    const all: AsistenciaMap = {}
+    estudiantes.forEach(e => { all[e.id] = true })
+    setAsistencias(all)
     const upserts = estudiantes.map(e => ({
       sesion_id: sesionSel,
       estudiante_id: e.id,
-      asistio: asistencias[e.id] ?? false,
+      asistio: true,
     }))
     await supabase.from('asistencias').upsert(upserts, { onConflict: 'sesion_id,estudiante_id' })
-    setSaving(false)
-    setSaved(true)
+    setUltimoGuardado('todos')
+    setTimeout(() => setUltimoGuardado(null), 2000)
   }
 
   const sesActual = sesiones.find(s => s.id === sesionSel)
@@ -78,7 +89,7 @@ export default function AsistenciaPage({ params }: { params: Promise<{ id: strin
 
       <div className="card mb-4">
         <label className="block text-sm font-medium text-[#3E5C76] mb-2">Selecciona la clase</label>
-        <select className="input" value={sesionSel} onChange={e => { setSesionSel(e.target.value); setSaved(false) }}>
+        <select className="input" value={sesionSel} onChange={e => setSesionSel(e.target.value)}>
           {sesiones.map(s => (
             <option key={s.id} value={s.id}>
               Clase {s.numero_clase} — {new Date(s.fecha + 'T12:00:00').toLocaleDateString('es-EC', { weekday:'long', day:'numeric', month:'long' })}
@@ -97,45 +108,34 @@ export default function AsistenciaPage({ params }: { params: Promise<{ id: strin
               <div className="h-full bg-[#3E5C76] rounded-full transition-all" style={{ width: total > 0 ? `${(presentes/total)*100}%` : '0%' }} />
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => { const all: AsistenciaMap = {}; estudiantes.forEach(e => all[e.id] = true); setAsistencias(all); setSaved(false) }}
-              className="btn-secondary btn-sm">Todos presentes</button>
-            <button onClick={guardar} disabled={saving} className="btn-primary btn-sm flex items-center gap-1">
-              {saving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              {saved ? '✓ Guardado' : 'Guardar'}
-            </button>
-          </div>
+          <button onClick={marcarTodos} className="btn-secondary btn-sm">Todos presentes</button>
         </div>
       )}
 
+      <div style={{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'12px', fontSize:'11px', color:'#9CA8B3' }}>
+        <span style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#10B981', display:'inline-block' }} />
+        Las asistencias se guardan automáticamente al marcar
+      </div>
+
       <div className="space-y-2">
         {estudiantes.map(e => (
-          <div key={e.id} className={`card flex items-center justify-between cursor-pointer transition-colors ${asistencias[e.id] ? 'border-green-300 bg-green-50' : 'border-red-200 bg-red-50'}`}
-            onClick={() => toggle(e.id)}>
+          <div key={e.id}
+            className={`card flex items-center justify-between cursor-pointer transition-colors ${asistencias[e.id] ? 'border-green-300 bg-green-50' : 'border-red-200 bg-red-50'}`}
+            onClick={() => toggle(e.id)}
+            style={{ position:'relative' }}>
             <div className="flex items-center gap-3">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${asistencias[e.id] ? 'bg-green-500 text-white' : 'bg-red-400 text-white'}`}>
                 {e.apellido[0]}{e.nombre[0]}
               </div>
               <span className="text-sm font-medium text-[#1a1a1a]">{e.apellido}, {e.nombre}</span>
             </div>
-            <div className={`w-12 h-6 rounded-full transition-colors flex items-center px-0.5 ${asistencias[e.id] ? 'bg-green-500' : 'bg-gray-300'}`}>
-              <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${asistencias[e.id] ? 'translate-x-6' : 'translate-x-0'}`} />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {estudiantes.length === 0 && (
-        <div className="card text-center py-8">
-          <p className="text-[#9CA8B3] text-sm">No hay estudiantes registrados en este módulo.</p>
-        </div>
-      )}
-
-      {saved && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
-          ✓ Asistencia guardada correctamente
-        </div>
-      )}
-    </div>
-  )
-}
+            <div className="flex items-center gap-2">
+              {guardando === e.id && (
+                <span style={{ width:'12px', height:'12px', border:'2px solid #3E5C76', borderTopColor:'transparent', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />
+              )}
+              {ultimoGuardado === e.id && guardando !== e.id && (
+                <span style={{ fontSize:'11px', color:'#10B981', fontWeight:500 }}>✓</span>
+              )}
+              <div className={`w-12 h-6 rounded-full transition-colors flex items-center px-0.5 ${asistencias[e.id] ? 'bg-green-500' : 'bg-gray-300'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${asistencias[e.id] ? 'translate-x-6' : 'translate-x-0'}`} />
+              </div>
