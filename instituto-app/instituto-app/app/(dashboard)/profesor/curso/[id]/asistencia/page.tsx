@@ -121,8 +121,7 @@ export default function AsistenciaPage({ params }: { params: Promise<{ id: strin
         {estudiantes.map(e => (
           <div key={e.id}
             className={`card flex items-center justify-between cursor-pointer transition-colors ${asistencias[e.id] ? 'border-green-300 bg-green-50' : 'border-red-200 bg-red-50'}`}
-            onClick={() => toggle(e.id)}
-            style={{ position:'relative' }}>
+            onClick={() => toggle(e.id)}>
             <div className="flex items-center gap-3">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${asistencias[e.id] ? 'bg-green-500 text-white' : 'bg-red-400 text-white'}`}>
                 {e.apellido[0]}{e.nombre[0]}
@@ -139,3 +138,24 @@ export default function AsistenciaPage({ params }: { params: Promise<{ id: strin
               <div className={`w-12 h-6 rounded-full transition-colors flex items-center px-0.5 ${asistencias[e.id] ? 'bg-green-500' : 'bg-gray-300'}`}>
                 <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${asistencias[e.id] ? 'translate-x-6' : 'translate-x-0'}`} />
               </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {estudiantes.length === 0 && (
+        <div className="card text-center py-8">
+          <p className="text-[#9CA8B3] text-sm">No hay estudiantes registrados en este módulo.</p>
+        </div>
+      )}
+
+      {ultimoGuardado === 'todos' && (
+        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
+          ✓ Todos marcados como presentes
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
