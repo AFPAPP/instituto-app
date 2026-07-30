@@ -20,7 +20,7 @@ export default function NotasPage({ params }: { params: Promise<{ id: string }> 
     async function load() {
       const { data: mod } = await supabase.from('modulos').select('nivel, modulo, grupo').eq('id', id).single()
       setModulo(mod)
-      const { data: est } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', id).order('apellido')
+      const { data: est } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', id).eq('retirado', false).order('apellido')
       setEstudiantes(est || [])
       if (est) {
         const ids = est.map(e => e.id)
@@ -35,7 +35,7 @@ export default function NotasPage({ params }: { params: Promise<{ id: string }> 
   }, [id])
 
   function setNota(estId: string, campo: keyof Nota, val: string) {
-    const n = val === '' ? null : Math.min(25, Math.max(0, parseInt(val) || 0))
+    const n = val === '' ? null : Math.min(25, Math.max(0, parseFloat(val) || 0))
     setNotas(prev => ({ ...prev, [estId]: { ...prev[estId], [campo]: n } }))
     setSaved(false)
   }
@@ -50,7 +50,7 @@ export default function NotasPage({ params }: { params: Promise<{ id: string }> 
 
   function total(n: Nota) {
     if (n.p_oral === null || n.p_escrita === null || n.c_oral === null || n.c_escrita === null) return null
-    return n.p_oral + n.p_escrita + n.c_oral + n.c_escrita
+    return Math.round((n.p_oral + n.p_escrita + n.c_oral + n.c_escrita) * 100) / 100
   }
 
   const aprobados = estudiantes.filter(e => { const t = total(notas[e.id] || {}); return t !== null && t >= 50 }).length
@@ -97,7 +97,7 @@ export default function NotasPage({ params }: { params: Promise<{ id: string }> 
                 </div>
                 {(['p_oral','p_escrita','c_oral','c_escrita'] as (keyof Nota)[]).map(campo => (
                   <div key={campo} className="px-1">
-                    <input type="number" min="0" max="25" className="input text-center text-sm py-1 px-1"
+                    <input type="number" min="0" max="25" step="0.01" className="input text-center text-sm py-1 px-1"
                       value={n[campo] ?? ''} placeholder="—"
                       onChange={ev => setNota(e.id, campo, ev.target.value)} />
                   </div>
