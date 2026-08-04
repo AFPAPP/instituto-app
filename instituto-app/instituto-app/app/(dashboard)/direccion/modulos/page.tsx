@@ -38,14 +38,20 @@ export default function ModulosPage() {
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [calculando, setCalculando] = useState(false)
 
-   async function load() {
-    // Actualizar automáticamente módulos cuya fecha fin ya pasó
+     async function load() {
     const hoy = new Date().toISOString().split('T')[0]
+    // Cambiar a finalizado si ya pasó la fecha de fin
     await supabase.from('modulos')
       .update({ estado: 'finalizado' })
       .in('estado', ['en_curso', 'por_iniciar'])
       .lt('fecha_fin', hoy)
       .not('fecha_fin', 'is', null)
+    // Cambiar a en_curso si ya comenzó
+    await supabase.from('modulos')
+      .update({ estado: 'en_curso' })
+      .eq('estado', 'por_iniciar')
+      .lte('fecha_inicio', hoy)
+      .not('fecha_inicio', 'is', null)
 
     const { data } = await supabase.from('modulos').select('*, profesores(nombre)').order('nivel').order('modulo')
     setModulos(((data as unknown) as Modulo[]) || [])
