@@ -9,17 +9,25 @@ const ESTADOS = ['por_iniciar','en_curso','finalizado','pausado']
 const ESTADO_LABEL: Record<string,string> = { por_iniciar:'Por iniciar', en_curso:'En curso', finalizado:'Finalizado', pausado:'Pausado' }
 const ESTADO_BADGE: Record<string,string> = { por_iniciar:'badge-warning', en_curso:'badge-success', finalizado:'badge-gray', pausado:'badge-danger' }
 
-const HORAS_ADULTOS: Record<string, number> = {
-  'A1-Módulo 1':60,'A1-Módulo 2':60,
-  'A2-Módulo 1':50,'A2-Módulo 2':50,'A2-Módulo 3':50,'A2-Módulo 4':50,
-  'B1-Módulo 1':80,'B1-Módulo 2':80,'B1-Módulo 3':80,
-  'B2-Módulo 1':90,'B2-Módulo 2':90,'B2-Módulo 3':90,
-  'C1-Módulo 1':80,'C1-Módulo 2':80,'C1-Módulo 3':80,'C1-Módulo 4':80,
+const SIGUIENTE: Record<string, { nivel: string; modulo: string }> = {
+  'A1-Módulo 1': { nivel:'A1', modulo:'Módulo 2' },
+  'A1-Módulo 2': { nivel:'A2', modulo:'Módulo 1' },
+  'A2-Módulo 1': { nivel:'A2', modulo:'Módulo 2' },
+  'A2-Módulo 2': { nivel:'A2', modulo:'Módulo 3' },
+  'A2-Módulo 3': { nivel:'A2', modulo:'Módulo 4' },
+  'A2-Módulo 4': { nivel:'B1', modulo:'Módulo 1' },
+  'B1-Módulo 1': { nivel:'B1', modulo:'Módulo 2' },
+  'B1-Módulo 2': { nivel:'B1', modulo:'Módulo 3' },
+  'B1-Módulo 3': { nivel:'B2', modulo:'Módulo 1' },
+  'B2-Módulo 1': { nivel:'B2', modulo:'Módulo 2' },
+  'B2-Módulo 2': { nivel:'B2', modulo:'Módulo 3' },
+  'B2-Módulo 3': { nivel:'C1', modulo:'Módulo 1' },
+  'C1-Módulo 1': { nivel:'C1', modulo:'Módulo 2' },
+  'C1-Módulo 2': { nivel:'C1', modulo:'Módulo 3' },
+  'C1-Módulo 3': { nivel:'C1', modulo:'Módulo 4' },
 }
-const HORAS_ADOLESCENTES = 104
-const DIAS_NUM: Record<string,number> = { Lu:1,Ma:2,Mi:3,Ju:4,Vi:5,Sá:6,Sa:6 }
 
-interface Modulo { id:string; nivel:string; modulo:string; grupo:string; tipo_grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; precio_mes:number; estado:string; profesores?:{nombre:string} }
+interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; tipo_grupo:string; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; profesores?:{nombre:string} }
 interface Profesor { id:string; nombre:string }
 
 const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', tipo_grupo:'adultos', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar' }
@@ -32,27 +40,27 @@ export default function ModulosPage() {
   const [profesores, setProfesores] = useState<Profesor[]>([])
   const [form, setForm] = useState({ ...empty })
   const [editId, setEditId] = useState<string|null>(null)
+  const [moduloOrigenId, setModuloOrigenId] = useState<string|null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [calculando, setCalculando] = useState(false)
 
-     async function load() {
-    const hoy = new Date().toISOString().split('T')[0]
-    // Cambiar a finalizado si ya pasó la fecha de fin
-    await supabase.from('modulos')
-      .update({ estado: 'finalizado' })
-      .in('estado', ['en_curso', 'por_iniciar'])
-      .lt('fecha_fin', hoy)
-      .not('fecha_fin', 'is', null)
-    // Cambiar a en_curso si ya comenzó
-    await supabase.from('modulos')
-      .update({ estado: 'en_curso' })
-      .eq('estado', 'por_iniciar')
-      .lte('fecha_inicio', hoy)
-      .not('fecha_inicio', 'is', null)
+  const HORAS_ADULTOS: Record<string, number> = {
+    'A1-Módulo 1':60,'A1-Módulo 2':60,
+    'A2-Módulo 1':50,'A2-Módulo 2':50,'A2-Módulo 3':50,'A2-Módulo 4':50,
+    'B1-Módulo 1':80,'B1-Módulo 2':80,'B1-Módulo 3':80,
+    'B2-Módulo 1':90,'B2-Módulo 2':90,'B2-Módulo 3':90,
+    'C1-Módulo 1':80,'C1-Módulo 2':80,'C1-Módulo 3':80,'C1-Módulo 4':80,
+  }
+  const HORAS_ADOLESCENTES = 104
+  const DIAS_NUM: Record<string,number> = { Lu:1,Ma:2,Mi:3,Ju:4,Vi:5,Sá:6,Sa:6 }
 
+  async function load() {
+    const hoy = new Date().toISOString().split('T')[0]
+    await supabase.from('modulos').update({ estado: 'finalizado' }).in('estado', ['en_curso','por_iniciar']).lt('fecha_fin', hoy).not('fecha_fin','is',null)
+    await supabase.from('modulos').update({ estado: 'en_curso' }).eq('estado','por_iniciar').lte('fecha_inicio', hoy).not('fecha_inicio','is',null)
     const { data } = await supabase.from('modulos').select('*, profesores(nombre)').order('nivel').order('modulo')
     setModulos(((data as unknown) as Modulo[]) || [])
     const { data: profs } = await supabase.from('profesores').select('id, nombre').eq('rol', 'profesor').order('nombre')
@@ -64,35 +72,9 @@ export default function ModulosPage() {
     setForm(f => ({ ...f, dias: f.dias.includes(d) ? f.dias.filter(x => x !== d) : [...f.dias, d] }))
   }
 
-  async function guardar() {
-    if (!form.profesor_id || !form.grupo) { setMsg('Completa todos los campos requeridos'); return }
-    setSaving(true)
-    const data = { ...form, fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null, fecha_examen_modulo: form.fecha_examen_modulo || null, fecha_examen_nivel: form.fecha_examen_nivel || null }
-    if (editId) {
-      await supabase.from('modulos').update(data).eq('id', editId)
-      if (form.fecha_inicio && form.fecha_fin) await supabase.rpc('generar_sesiones', { p_modulo_id: editId })
-    } else {
-      const { data: nuevo } = await supabase.from('modulos').insert(data).select().single()
-      if (nuevo && form.fecha_inicio && form.fecha_fin) await supabase.rpc('generar_sesiones', { p_modulo_id: nuevo.id })
-    }
-    setShowForm(false); setEditId(null); setForm({ ...empty }); setSaving(false); setMsg(''); load()
-  }
-
-  function editar(m: Modulo) {
-    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado })
-    setEditId(m.id); setShowForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  async function eliminar(id: string) {
-    if (!confirm('¿Eliminar este módulo y todos sus datos?')) return
-    await supabase.from('modulos').delete().eq('id', id); load()
-  }
-
   async function calcularFechaFin() {
     if (!form.fecha_inicio || form.dias.length === 0 || !form.horas_sesion) {
-      setMsg('Para calcular necesitas: fecha de inicio, días de clase y horas por sesión')
-      return
+      setMsg('Para calcular necesitas: fecha de inicio, días de clase y horas por sesión'); return
     }
     let totalHoras: number
     if (form.tipo_grupo === 'adolescentes') {
@@ -113,32 +95,93 @@ export default function ModulosPage() {
     while (fechas.length < sesionesNecesarias && intentos < 500) {
       const iso = cur.toISOString().split('T')[0]
       if (diasNums.includes(cur.getDay()) && !feriadosSet.has(iso)) fechas.push(iso)
-      cur.setDate(cur.getDate() + 1)
-      intentos++
+      cur.setDate(cur.getDate() + 1); intentos++
     }
     if (fechas.length === sesionesNecesarias) {
       setForm(f => ({ ...f, fecha_fin: fechas[fechas.length - 1] }))
-      setMsg(`✅ ${sesionesNecesarias} sesiones × ${form.horas_sesion}h = ${totalHoras}h ${form.tipo_grupo === 'adolescentes' ? '(Adolescentes)' : '(Adultos)'}. Feriados saltados automáticamente.`)
+      setMsg(`✅ ${sesionesNecesarias} sesiones × ${form.horas_sesion}h = ${totalHoras}h. Feriados saltados automáticamente.`)
     }
     setCalculando(false)
   }
 
-  const modulosFiltrados = filtro === 'todos' ? modulos : modulos.filter(m => m.estado === filtro)
-  const activos = modulosFiltrados.filter(m => m.estado !== 'finalizado')
-  const finalizados = modulosFiltrados.filter(m => m.estado === 'finalizado')
+  async function guardar() {
+    if (!form.profesor_id || !form.grupo) { setMsg('Completa todos los campos requeridos'); return }
+    setSaving(true)
+    const data = { ...form, fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null, fecha_examen_modulo: form.fecha_examen_modulo || null, fecha_examen_nivel: form.fecha_examen_nivel || null }
+    if (editId) {
+      await supabase.from('modulos').update(data).eq('id', editId)
+      if (form.fecha_inicio && form.fecha_fin) await supabase.rpc('generar_sesiones', { p_modulo_id: editId })
+    } else {
+      const { data: nuevo } = await supabase.from('modulos').insert(data).select().single()
+      if (nuevo) {
+        if (form.fecha_inicio && form.fecha_fin) await supabase.rpc('generar_sesiones', { p_modulo_id: nuevo.id })
+        // Copiar estudiantes del módulo origen si es continuación
+        if (moduloOrigenId) {
+          const { data: estsOrigen } = await supabase.from('estudiantes')
+            .select('apellido, nombre, codigo, categoria_edad, tipo_inscripcion, descuento_pct')
+            .eq('modulo_id', moduloOrigenId)
+            .eq('retirado', false)
+          if (estsOrigen && estsOrigen.length > 0) {
+            const nuevosEsts = estsOrigen.map(e => ({
+              ...e,
+              modulo_id: nuevo.id,
+              tipo_inscripcion: 'recurrente',
+              estado_pago: 'pendiente',
+              retirado: false,
+            }))
+            await supabase.from('estudiantes').insert(nuevosEsts)
+          }
+        }
+      }
+    }
+    setShowForm(false); setEditId(null); setModuloOrigenId(null); setForm({ ...empty }); setSaving(false); setMsg(''); load()
+  }
 
+  function editar(m: Modulo) {
+    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado })
+    setEditId(m.id); setModuloOrigenId(null); setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function crearSiguiente(m: Modulo) {
+    const key = `${m.nivel}-${m.modulo}`
+    const sig = SIGUIENTE[key]
+    if (!sig) { alert('Este es el último módulo de la secuencia.'); return }
+    setForm({
+      nivel: sig.nivel, modulo: sig.modulo,
+      grupo: '', tipo_grupo: m.tipo_grupo || 'adultos',
+      profesor_id: m.profesor_id, modalidad: m.modalidad,
+      dias: m.dias, horas_sesion: m.horas_sesion,
+      fecha_inicio: '', fecha_fin: '',
+      fecha_examen_modulo: '', fecha_examen_nivel: '',
+      precio_mes: m.precio_mes, estado: 'por_iniciar',
+    })
+    setEditId(null); setModuloOrigenId(m.id); setShowForm(true)
+    setMsg(`✨ Continuación de ${m.nivel} — ${m.modulo}. Los estudiantes activos se copiarán automáticamente como recurrentes.`)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function eliminar(id: string) {
+    if (!confirm('¿Eliminar este módulo y todos sus datos?')) return
+    await supabase.from('modulos').delete().eq('id', id); load()
+  }
+
+  const modulosFiltrados = filtro === 'todos' ? modulos : modulos.filter(m => m.estado === filtro)
+  const activos    = modulosFiltrados.filter(m => m.estado !== 'finalizado')
+  const finalizados = modulosFiltrados.filter(m => m.estado === 'finalizado')
   const conteos: Record<string, number> = { todos: modulos.length }
   ESTADOS.forEach(e => { conteos[e] = modulos.filter(m => m.estado === e).length })
 
   const filtros: { key: Filtro; label: string }[] = [
-    { key: 'todos',       label: 'Todos' },
-    { key: 'en_curso',    label: 'En curso' },
+    { key: 'todos', label: 'Todos' },
+    { key: 'en_curso', label: 'En curso' },
     { key: 'por_iniciar', label: 'Por iniciar' },
-    { key: 'finalizado',  label: 'Finalizados' },
-    { key: 'pausado',     label: 'Pausados' },
+    { key: 'finalizado', label: 'Finalizados' },
+    { key: 'pausado', label: 'Pausados' },
   ]
 
   function FilaModulo({ m, opaco = false }: { m: Modulo; opaco?: boolean }) {
+    const tieneSiguiente = !!SIGUIENTE[`${m.nivel}-${m.modulo}`]
     return (
       <div className="p-3 hover:bg-[#FAF3E8] transition-colors" style={{ opacity: opaco ? 0.65 : 1 }}>
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'12px' }}>
@@ -164,9 +207,15 @@ export default function ModulosPage() {
               {m.fecha_examen_nivel && <span style={{ fontSize:'11px', background:'#FEF3C7', color:'#92400E', padding:'1px 7px', borderRadius:'4px' }}>🎓 Examen nivel: {m.fecha_examen_nivel}</span>}
             </div>
           </div>
-          <div style={{ display:'flex', gap:'6px', flexShrink:0, alignItems:'center' }}>
-            <a href={`/direccion/modulos/${m.id}/imprimir`} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#1B5E20', border:'1px solid #1B5E20', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>🖨️</a>
-            <a href={`/direccion/modulos/${m.id}`} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#5B21B6', border:'1px solid #5B21B6', borderRadius:'8px', cursor:'pointer', textDecoration:'none', display:'inline-block' }}>Sesiones</a>
+          <div style={{ display:'flex', gap:'6px', flexShrink:0, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+            {m.estado === 'finalizado' && tieneSiguiente && (
+              <button onClick={() => crearSiguiente(m)}
+                style={{ padding:'4px 10px', fontSize:'12px', background:'#D97706', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', whiteSpace:'nowrap' }}>
+                ➡️ Siguiente
+              </button>
+            )}
+            <a href={`/direccion/modulos/${m.id}/imprimir`} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#1B5E20', border:'1px solid #1B5E20', borderRadius:'8px', textDecoration:'none', display:'inline-block' }}>🖨️</a>
+            <a href={`/direccion/modulos/${m.id}`} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#5B21B6', border:'1px solid #5B21B6', borderRadius:'8px', textDecoration:'none', display:'inline-block' }}>Sesiones</a>
             <button onClick={() => editar(m)} style={{ padding:'4px 12px', fontSize:'12px', background:'transparent', color:'#3E5C76', border:'1px solid #3E5C76', borderRadius:'8px', cursor:'pointer' }}>Editar</button>
             <button onClick={() => eliminar(m.id)} style={{ padding:'4px 12px', fontSize:'12px', background:'#BC4A3C', color:'white', border:'none', borderRadius:'8px', cursor:'pointer' }}>✕</button>
           </div>
@@ -179,29 +228,32 @@ export default function ModulosPage() {
     <div>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px' }}>
         <h1 className="text-2xl font-bold text-[#3E5C76]">Módulos</h1>
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm({ ...empty }) }} className="btn-primary">+ Nuevo módulo</button>
+        <button onClick={() => { setShowForm(true); setEditId(null); setModuloOrigenId(null); setForm({ ...empty }) }} className="btn-primary">+ Nuevo módulo</button>
       </div>
 
       {showForm && (
         <div className="card mb-6">
-          <h2 className="font-semibold text-[#3E5C76] mb-4">{editId ? 'Editar módulo' : 'Nuevo módulo'}</h2>
+          <h2 className="font-semibold text-[#3E5C76] mb-2">
+            {editId ? 'Editar módulo' : moduloOrigenId ? `Siguiente módulo — ${form.nivel} ${form.modulo}` : 'Nuevo módulo'}
+          </h2>
+          {moduloOrigenId && (
+            <div style={{ background:'#FEF3C7', border:'0.5px solid #FDE68A', borderRadius:'8px', padding:'8px 12px', marginBottom:'12px', fontSize:'12px', color:'#92400E' }}>
+              ✨ Los estudiantes activos del módulo anterior se copiarán automáticamente como recurrentes al guardar.
+            </div>
+          )}
 
-          {/* Tipo de grupo */}
           <div style={{ marginBottom:'16px', padding:'12px', background:'#F0F9FF', borderRadius:'8px', border:'0.5px solid #BAE6FD' }}>
             <p style={{ fontSize:'12px', fontWeight:500, color:'#0369A1', marginBottom:'8px' }}>Tipo de grupo</p>
             <div style={{ display:'flex', gap:'10px' }}>
               <button type="button" onClick={() => setForm(f => ({ ...f, tipo_grupo:'adultos' }))}
-                style={{ flex:1, padding:'10px', borderRadius:'8px', border:'1.5px solid', cursor:'pointer', transition:'all 0.15s', background: form.tipo_grupo === 'adultos' ? '#3E5C76' : 'white', color: form.tipo_grupo === 'adultos' ? 'white' : '#6B8294', borderColor: form.tipo_grupo === 'adultos' ? '#3E5C76' : '#E8DFCF', fontSize:'13px', fontWeight:500 }}>
+                style={{ flex:1, padding:'10px', borderRadius:'8px', border:'1.5px solid', cursor:'pointer', background: form.tipo_grupo === 'adultos' ? '#3E5C76' : 'white', color: form.tipo_grupo === 'adultos' ? 'white' : '#6B8294', borderColor: form.tipo_grupo === 'adultos' ? '#3E5C76' : '#E8DFCF', fontSize:'13px', fontWeight:500 }}>
                 🧑 Adultos
               </button>
               <button type="button" onClick={() => setForm(f => ({ ...f, tipo_grupo:'adolescentes' }))}
-                style={{ flex:1, padding:'10px', borderRadius:'8px', border:'1.5px solid', cursor:'pointer', transition:'all 0.15s', background: form.tipo_grupo === 'adolescentes' ? '#1E40AF' : 'white', color: form.tipo_grupo === 'adolescentes' ? 'white' : '#6B8294', borderColor: form.tipo_grupo === 'adolescentes' ? '#1E40AF' : '#E8DFCF', fontSize:'13px', fontWeight:500 }}>
+                style={{ flex:1, padding:'10px', borderRadius:'8px', border:'1.5px solid', cursor:'pointer', background: form.tipo_grupo === 'adolescentes' ? '#1E40AF' : 'white', color: form.tipo_grupo === 'adolescentes' ? 'white' : '#6B8294', borderColor: form.tipo_grupo === 'adolescentes' ? '#1E40AF' : '#E8DFCF', fontSize:'13px', fontWeight:500 }}>
                 👦 Adolescentes
               </button>
             </div>
-            <p style={{ fontSize:'11px', color:'#0369A1', marginTop:'6px' }}>
-              {form.tipo_grupo === 'adolescentes' ? '📚 Adolescentes: 104h por nivel (calculado automáticamente)' : '📚 Adultos: horas variables según nivel y módulo'}
-            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -257,10 +309,10 @@ export default function ModulosPage() {
               {DIAS.map(d => <button key={d} type="button" onClick={() => toggleDia(d)}
                 style={{ padding:'4px 12px', fontSize:'13px', borderRadius:'8px', border:'1px solid', cursor:'pointer', background: form.dias.includes(d) ? '#3E5C76' : 'transparent', color: form.dias.includes(d) ? 'white' : '#6B8294', borderColor: form.dias.includes(d) ? '#3E5C76' : '#E8DFCF' }}>{d}</button>)}
             </div></div>
-          {msg && <p className="text-sm mt-2" style={{ color: msg.startsWith('✅') ? '#1B5E20' : '#BC4A3C' }}>{msg}</p>}
+          {msg && <p className="text-sm mt-2" style={{ color: msg.startsWith('✅') || msg.startsWith('✨') ? '#1B5E20' : '#BC4A3C' }}>{msg}</p>}
           <div className="flex gap-2 mt-4">
             <button onClick={guardar} disabled={saving} className="btn-primary">{saving ? 'Guardando...' : 'Guardar'}</button>
-            <button onClick={() => { setShowForm(false); setEditId(null) }} className="btn-secondary">Cancelar</button>
+            <button onClick={() => { setShowForm(false); setEditId(null); setModuloOrigenId(null); setMsg('') }} className="btn-secondary">Cancelar</button>
           </div>
         </div>
       )}
