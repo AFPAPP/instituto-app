@@ -11,7 +11,6 @@ interface Sesion {
   motivo_cancelacion: string | null
   profesor_reemplazo_id: string | null
   profesor_reemplazo_externo: string | null
-  profesores_reemplazo?: { nombre: string } | null
 }
 interface Profesor { id: string; nombre: string }
 
@@ -38,15 +37,17 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
     setModulo(mod)
     const { data: ses } = await supabase
       .from('sesiones')
-      .select('id, fecha, numero_clase, cancelada, motivo_cancelacion, profesor_reemplazo_id, profesor_reemplazo_externo, profesores_reemplazo:profesor_reemplazo_id(nombre)')
+      .select('id, fecha, numero_clase, cancelada, motivo_cancelacion, profesor_reemplazo_id, profesor_reemplazo_externo')
       .eq('modulo_id', id)
       .order('fecha')
-    setSesiones(((ses as unknown) as Sesion[]) || [])
+    setSesiones((ses as Sesion[]) || [])
     const { data: profs } = await supabase.from('profesores').select('id, nombre').eq('rol', 'profesor').order('nombre')
     setProfesores(profs || [])
   }
 
   useEffect(() => { load() }, [id])
+
+  const profMap = new Map(profesores.map(p => [p.id, p.nombre]))
 
   function abrirEdicion(s: Sesion) {
     setEditando(s.id)
@@ -143,7 +144,7 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
             const fecha = new Date(s.fecha + 'T12:00:00')
             const esCancelada = s.cancelada
             const tieneReemplazo = (s.profesor_reemplazo_id || s.profesor_reemplazo_externo) && !s.cancelada
-            const reemplazaNombre = s.profesor_reemplazo_externo || (s.profesores_reemplazo as {nombre:string}|null)?.nombre
+            const reemplazaNombre = s.profesor_reemplazo_externo || profMap.get(s.profesor_reemplazo_id || '') || null
             const esExterno = !!s.profesor_reemplazo_externo
 
             return (
@@ -157,7 +158,6 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
                       <p style={{ fontSize:'10px', color:'#9CA8B3', margin:0 }}>{DIAS_ESP[fecha.getDay()]}</p>
                       <p style={{ fontSize:'9px', color:'#9CA8B3', margin:0 }}>{MESES_ESP[fecha.getMonth()].slice(0,3)}</p>
                     </div>
-
                     <div style={{ flex:1 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
                         <span style={{ fontSize:'13px', fontWeight:500, color: esCancelada ? '#9CA8B3' : '#1a1a1a', textDecoration: esCancelada ? 'line-through' : 'none' }}>
@@ -177,7 +177,6 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
                       )}
                     </div>
                   </div>
-
                   <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
                     {(esCancelada || tieneReemplazo) && (
                       <button onClick={() => limpiar(s.id)} style={{ padding:'4px 10px', fontSize:'11px', background:'transparent', color:'#9CA8B3', border:'1px solid #E8DFCF', borderRadius:'6px', cursor:'pointer' }}>
@@ -227,7 +226,7 @@ export default function SesionesModuloPage({ params }: { params: Promise<{ id: s
                         )}
                         <button onClick={() => guardar(s.id, false)}
                           disabled={saving || (tipoReemplazo === 'interno' ? !formReemplazo : !formReemplazoExterno)}
-                          style={{ padding:'5px 12px', fontSize:'12px', background: (tipoReemplazo === 'interno' ? formReemplazo : formReemplazoExterno) ? '#5B21B6' : '#E8DFCF', color: (tipoReemplazo === 'interno' ? formReemplazo : formReemplazoExterno) ? 'white' : '#9CA8B3', border:'none', borderRadius:'6px', cursor: 'pointer', width:'100%' }}>
+                          style={{ padding:'5px 12px', fontSize:'12px', background: (tipoReemplazo === 'interno' ? formReemplazo : formReemplazoExterno) ? '#5B21B6' : '#E8DFCF', color: (tipoReemplazo === 'interno' ? formReemplazo : formReemplazoExterno) ? 'white' : '#9CA8B3', border:'none', borderRadius:'6px', cursor:'pointer', width:'100%' }}>
                           {saving ? 'Guardando...' : 'Confirmar reemplazo'}
                         </button>
                       </div>
