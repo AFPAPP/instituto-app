@@ -6,118 +6,75 @@ export default async function DireccionPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/')
-  const { data: me } = await supabase.from('profesores').select('rol').eq('user_id', user.id).single()
+  const { data: me } = await supabase.from('profesores').select('rol, nombre').eq('user_id', user.id).single()
   if (me?.rol !== 'direccion') redirect('/profesor')
 
-  const [{ count: totalEst }, { count: cursosActivos }, { count: totalProfs }] = await Promise.all([
-    supabase.from('estudiantes').select('*', { count: 'exact', head: true }).eq('retirado', false),
-    supabase.from('modulos').select('*', { count: 'exact', head: true }).eq('estado', 'en_curso'),
-    supabase.from('profesores').select('*', { count: 'exact', head: true }).eq('rol', 'profesor'),
-  ])
+  // Métricas
+  const { data: modulos } = await supabase.from('modulos').select('id, estado')
+  const { data: estudiantes } = await supabase.from('estudiantes').select('id, retirado')
+  const { data: notifs } = await supabase.from('notificaciones').select('id').eq('leida', false)
+  const { data: inscripciones } = await supabase.from('inscripciones').select('id, estado').eq('estado', 'Pendiente')
 
-  // Detectar inasistencias consecutivas (2 o más clases seguidas)
-  const alertasConsecutivas: { nombre: string; apellido: string; nivel: string; modulo: string; grupo: string; profesor: string; consecutivas: number; fechas: string[] }[] = []
-
-  const { data: modActivos } = await supabase.from('modulos').select('id, nivel, modulo, grupo, profesores(nombre)').eq('estado', 'en_curso')
-
-  for (const mod of modActivos || []) {
-    const { data: ests } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', mod.id).eq('retirado', false)
-       const hoy = new Date().toISOString().split('T')[0]
-    const { data: sesiones } = await supabase.from('sesiones').select('id, fecha').eq('modulo_id', mod.id).lte('fecha', hoy).order('fecha')
-    if (!ests || !sesiones || sesiones.length < 2) continue
-
-    for (const est of ests) {
-      const { data: asis } = await supabase.from('asistencias').select('sesion_id, asistio').eq('estudiante_id', est.id).in('sesion_id', sesiones.map(s => s.id))
-      const asisMap = new Map(asis?.map(a => [a.sesion_id, a.asistio]) || [])
-
-      let consecutivas: string[] = []
-      let maxConsec = 0
-      let maxFechas: string[] = []
-
-      for (const ses of sesiones) {
-        if (asisMap.get(ses.id) === false) {
-          consecutivas.push(ses.fecha)
-          if (consecutivas.length > maxConsec) { maxConsec = consecutivas.length; maxFechas = [...consecutivas] }
-        } else { consecutivas = [] }
-      }
-
-      if (maxConsec >= 2) {
-        alertasConsecutivas.push({
-          apellido: est.apellido, nombre: est.nombre,
-          nivel: mod.nivel, modulo: mod.modulo, grupo: mod.grupo,
-          profesor: (mod.profesores as any)?.nombre || '—',
-          consecutivas: maxConsec, fechas: maxFechas,
-        })
-      }
-    }
-  }
-
-  const { data: modulos } = await supabase
-    .from('modulos').select('id, nivel, modulo, grupo, estado, profesores(nombre)')
-    .in('estado', ['en_curso', 'por_iniciar']).order('estado')
-
-  const metricas = [
-    { label: 'Estudiantes activos', val: totalEst || 0,       color: 'text-[#3E5C76]' },
-    { label: 'Cursos en curso',     val: cursosActivos || 0,  color: 'text-green-700' },
-    { label: 'Profesores',          val: totalProfs || 0,     color: 'text-[#3E5C76]' },
-    { label: 'Alertas asistencia',  val: alertasConsecutivas.length, color: alertasConsecutivas.length > 0 ? 'text-[#BC4A3C]' : 'text-green-700' },
-  ]
+  const enCurso   = modulos?.filter(m => m.estado === 'en_curso').length || 0
+  const activos   = estudiantes?.filter(e => !e.retirado).length || 0
+  const unread    = notifs?.length || 0
+  const pendInsc  = inscripciones?.length || 0
 
   const accesos = [
-    { href: '/direccion/modulos',      icon: '📚', label: 'Módulos',       desc: 'Crear y configurar cursos' },
-    { href: '/direccion/estudiantes',  icon: '👥', label: 'Estudiantes',   desc: 'Registrar y gestionar alumnos' },
-    { href: '/direccion/resumen',      icon: '📊', label: 'Resumen',       desc: 'Estado financiero por curso' },
-    { href: '/direccion/bilan',        icon: '📋', label: 'BILAN',         desc: 'Registro oficial anual' },
-    { href: '/direccion/feriados',     icon: '📅', label: 'Feriados',      desc: 'Días no lectivos del año' },
-    { href: '/direccion/reemplazos',   icon: '👤', label: 'Reemplazos',    desc: 'Control de reemplazos del mes' },
-    { href: '/direccion/estadisticas', icon: '📈', label: 'Estadísticas',  desc: 'Análisis por nivel' },
-    { href: '/direccion/usuarios',     icon: '🔑', label: 'Usuarios',      desc: 'Cuentas de profesores' },
+    { href:'/direccion/modulos',       icon:'📚', label:'Módulos',        desc:'Crear y gestionar cursos',           color:'#3E5C76' },
+    { href:'/direccion/estudiantes',   icon:'👥', label:'Estudiantes',    desc:'Registrar y gestionar alumnos',      color:'#3E5C76' },
+    { href:'/direccion/profesores',    icon:'👨‍🏫', label:'Profesores',     desc:'Ver cursos y gestionar asistencias', color:'#3E5C76' },
+    { href:'/direccion/resumen',       icon:'💰', label:'Resumen',         desc:'Estado financiero por curso',        color:'#3E5C76' },
+    { href:'/direccion/bilan',         icon:'📊', label:'BILAN',           desc:'Registro financiero anual',          color:'#3E5C76' },
+    { href:'/direccion/reemplazos',    icon:'🔄', label:'Reemplazos',      desc:'Resumen mensual de reemplazos',      color:'#3E5C76' },
+    { href:'/direccion/feriados',      icon:'🗓️', label:'Feriados',        desc:'Gestionar días no laborables',       color:'#3E5C76' },
+    { href:'/direccion/estadisticas',  icon:'📈', label:'Estadísticas',    desc:'Resumen por nivel y módulo',         color:'#3E5C76' },
+    { href:'/direccion/notificaciones',icon:'🔔', label:'Notificaciones',  desc: unread > 0 ? `${unread} sin leer` : 'Sin notificaciones nuevas', color: unread > 0 ? '#BC4A3C' : '#3E5C76' },
+    { href:'/direccion/inscripciones', icon:'📋', label:'Inscripciones',   desc: pendInsc > 0 ? `${pendInsc} pendientes` : 'Fichas recibidas',    color: pendInsc > 0 ? '#D97706' : '#3E5C76' },
+    { href:'/direccion/reporte',       icon:'📄', label:'Reporte anual',   desc:'Cuestionario oficial AF',            color:'#3E5C76' },
+    { href:'/direccion/usuarios',      icon:'⚙️', label:'Usuarios',        desc:'Gestionar accesos y roles',          color:'#3E5C76' },
   ]
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[#3E5C76] mb-6">Panel de dirección</h1>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-        {metricas.map(m => (
-          <div key={m.label} className="card text-center">
-            <p className={`text-2xl font-bold ${m.color}`}>{m.val}</p>
-            <p className="text-xs text-[#9CA8B3] mt-1">{m.label}</p>
-          </div>
-        ))}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#3E5C76]">Panel de dirección</h1>
+        <p className="text-[#6B8294] text-sm mt-1">Bienvenido, {me?.nombre}</p>
       </div>
 
+      {/* Métricas */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div className="card text-center">
+          <p className="text-3xl font-bold text-[#3E5C76]">{enCurso}</p>
+          <p className="text-xs text-[#9CA8B3] mt-1">Módulos en curso</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-3xl font-bold text-[#3E5C76]">{activos}</p>
+          <p className="text-xs text-[#9CA8B3] mt-1">Estudiantes activos</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-3xl font-bold text-[#BC4A3C]">{unread}</p>
+          <p className="text-xs text-[#9CA8B3] mt-1">Notificaciones</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-3xl font-bold text-[#D97706]">{pendInsc}</p>
+          <p className="text-xs text-[#9CA8B3] mt-1">Inscripciones pendientes</p>
+        </div>
+      </div>
 
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        {accesos.map(l => (
-          <Link key={l.href} href={l.href} className="card hover:shadow-md transition-shadow flex items-start gap-3" style={{ textDecoration:'none' }}>
-            <span className="text-2xl">{l.icon}</span>
-            <div><p className="font-medium text-[#3E5C76] text-sm">{l.label}</p><p className="text-xs text-[#9CA8B3] mt-0.5">{l.desc}</p></div>
+      {/* Accesos */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {accesos.map(a => (
+          <Link key={a.href} href={a.href} style={{ textDecoration:'none' }}>
+            <div className="card hover:shadow-md transition-shadow cursor-pointer h-full"
+              style={{ borderLeft:`3px solid ${a.color}` }}>
+              <div style={{ fontSize:'28px', marginBottom:'8px' }}>{a.icon}</div>
+              <p style={{ fontWeight:600, fontSize:'14px', color:'#1a1a1a', marginBottom:'3px' }}>{a.label}</p>
+              <p style={{ fontSize:'12px', color: a.color === '#BC4A3C' || a.color === '#D97706' ? a.color : '#9CA8B3' }}>{a.desc}</p>
+            </div>
           </Link>
         ))}
       </div>
-
-      {modulos && modulos.length > 0 && (
-        <div>
-          <h2 className="font-semibold text-[#3E5C76] mb-3">Cursos activos</h2>
-          <div className="card p-0 overflow-hidden">
-            <div className="divide-y divide-[#E8DFCF]">
-              {modulos.map(m => (
-                <div key={m.id} className="flex items-center justify-between p-3 hover:bg-[#FAF3E8] transition-colors">
-                  <div>
-                    <p className="font-medium text-sm text-[#1a1a1a]">{m.nivel} — {m.modulo} <span className="text-[#9CA8B3] font-normal">({m.grupo})</span></p>
-                    <p className="text-xs text-[#9CA8B3]">{(m.profesores as { nombre: string } | null)?.nombre}</p>
-                  </div>
-                  <span className={m.estado === 'en_curso' ? 'badge-success' : 'badge-warning'}>
-                    {m.estado === 'en_curso' ? 'En curso' : 'Por iniciar'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
