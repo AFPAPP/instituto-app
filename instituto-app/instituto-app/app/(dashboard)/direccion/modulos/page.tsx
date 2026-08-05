@@ -275,7 +275,7 @@ export default function ModulosPage() {
                 {MODALIDADES.map(m => <option key={m}>{m}</option>)}
               </select></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Horas/sesión</label>
-              <input type="number" className="input" min="1" max="10" value={form.horas_sesion} onChange={e => setForm(f => ({ ...f, horas_sesion: parseInt(e.target.value)||2 }))} /></div>
+                <input type="number" className="input" min="0.5" max="10" step="0.5" value={form.horas_sesion} onChange={e => setForm(f => ({ ...f, horas_sesion: parseFloat(e.target.value)||2 }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha inicio</label>
               <input type="date" className="input" value={form.fecha_inicio} onChange={e => setForm(f => ({ ...f, fecha_inicio: e.target.value }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha fin</label>
