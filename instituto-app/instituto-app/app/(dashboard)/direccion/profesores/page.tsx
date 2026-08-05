@@ -42,10 +42,10 @@ export default async function ProfesoresPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-[#1a1a1a]">{prof.nombre}</p>
-                   <p className="text-xs text-[#9CA8B3]">{prof.email}</p>
+                    <p className="text-xs text-[#9CA8B3]">{prof.email}</p>
                   </div>
                 </div>
-                <Link href={`/direccion/profesores/${id}/curso/${m.id}`}
+                <Link href={`/direccion/profesores/${prof.id}`}
                   style={{ padding:'6px 14px', fontSize:'12px', background:'transparent', color:'#3E5C76', border:'1px solid #3E5C76', borderRadius:'8px', textDecoration:'none' }}>
                   Ver cursos →
                 </Link>
@@ -54,7 +54,7 @@ export default async function ProfesoresPage() {
               {cursosProf.length > 0 ? (
                 <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
                   {cursosProf.map(m => (
-                    <Link key={m.id} href={`/direccion/profesores/${prof.id}/curso/${m.id}`}
+                    <Link key={m.id} href={`/direccion/profesores/${prof.id}/${m.id}`}
                       style={{ padding:'4px 10px', fontSize:'12px', background:'#F0F4F8', color:'#3E5C76', borderRadius:'8px', textDecoration:'none', border:'0.5px solid #E8DFCF' }}>
                       {m.nivel} — {m.modulo} <span style={{ fontSize:'10px', color:'#9CA8B3' }}>({m.grupo})</span>
                     </Link>
