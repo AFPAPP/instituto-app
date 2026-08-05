@@ -11,7 +11,7 @@ export default async function ProfesoresPage() {
 
   const { data: profesores } = await supabase
     .from('profesores')
-    .select('id, nombre, correo, rol')
+    .select('id, nombre, email, rol')
     .eq('rol', 'profesor')
     .order('nombre')
 
@@ -42,7 +42,7 @@ export default async function ProfesoresPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-[#1a1a1a]">{prof.nombre}</p>
-                    <p className="text-xs text-[#9CA8B3]">{prof.correo}</p>
+ <p className="text-xs text-[#9CA8B3]">{prof.email}</p>
                   </div>
                 </div>
                 <Link href={`/direccion/profesores/${prof.id}`}
