@@ -52,7 +52,7 @@ export default function ModulosPage() {
     'A2-Módulo 1':50,'A2-Módulo 2':50,'A2-Módulo 3':50,'A2-Módulo 4':50,
     'B1-Módulo 1':80,'B1-Módulo 2':80,'B1-Módulo 3':80,
     'B2-Módulo 1':90,'B2-Módulo 2':90,'B2-Módulo 3':90,
-    'C1-Módulo 1':80,'C1-Módulo 2':80,'C1-Módulo 3':80,'C1-Módulo 4':80,
+    'C1-Módulo 1':80,'C1-Módulo 2':80,'C1-Módulo 3':80,'C1-Módulo 4':85,
   }
   const HORAS_ADOLESCENTES = 104
   const DIAS_NUM: Record<string,number> = { Lu:1,Ma:2,Mi:3,Ju:4,Vi:5,Sá:6,Sa:6 }
