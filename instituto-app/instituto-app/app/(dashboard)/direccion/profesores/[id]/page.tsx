@@ -13,7 +13,7 @@ export default async function ProfesorDetallePage({ params }: { params: Promise<
   const { data: me } = await supabase.from('profesores').select('rol').eq('user_id', user.id).single()
   if (me?.rol !== 'direccion') redirect('/profesor')
 
-  const { data: prof } = await supabase.from('profesores').select('id, nombre, correo').eq('id', id).single()
+  const { data: prof } = await supabase.from('profesores').select('id, nombre, email').eq('id', id).single()
   if (!prof) redirect('/direccion/profesores')
 
   const { data: modulos } = await supabase
@@ -39,7 +39,7 @@ export default async function ProfesorDetallePage({ params }: { params: Promise<
         </div>
         <div>
           <h1 className="text-2xl font-bold text-[#3E5C76]">{prof.nombre}</h1>
-          <p className="text-[#6B8294] text-sm">{prof.correo}</p>
+          <p className="text-[#6B8294] text-sm">{prof.email}</p>
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export default async function ProfesorDetallePage({ params }: { params: Promise<
           <div className="card p-0 overflow-hidden">
             {activos.map((m, i) => (
               <div key={m.id} style={{ borderBottom: i < activos.length-1 ? '0.5px solid #E8DFCF' : 'none' }}>
-                <Link href={`/direccion/profesores/${id}/curso/${m.id}`} style={{ textDecoration:'none', display:'block', padding:'12px 16px' }}
+                <Link href={`/direccion/profesores/${id}/${m.id}`} style={{ textDecoration:'none', display:'block', padding:'12px 16px' }}
                   className="hover:bg-[#FAF3E8] transition-colors">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
@@ -86,7 +86,7 @@ export default async function ProfesorDetallePage({ params }: { params: Promise<
           <div className="card p-0 overflow-hidden">
             {finalizados.map((m, i) => (
               <div key={m.id} style={{ borderBottom: i < finalizados.length-1 ? '0.5px solid #E8DFCF' : 'none', opacity:0.65 }}>
-                <Link href={`/direccion/profesores/${id}/curso/${m.id}`} style={{ textDecoration:'none', display:'block', padding:'12px 16px' }}
+                <Link href={`/direccion/profesores/${id}/${m.id}`} style={{ textDecoration:'none', display:'block', padding:'12px 16px' }}
                   className="hover:bg-[#FAF3E8] transition-colors">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
