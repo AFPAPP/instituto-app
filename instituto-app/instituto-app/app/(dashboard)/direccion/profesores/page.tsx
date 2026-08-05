@@ -42,10 +42,10 @@ export default async function ProfesoresPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-[#1a1a1a]">{prof.nombre}</p>
- <p className="text-xs text-[#9CA8B3]">{prof.email}</p>
+                   <p className="text-xs text-[#9CA8B3]">{prof.email}</p>
                   </div>
                 </div>
-                <Link href={`/direccion/profesores/${prof.id}`}
+                <Link href={`/direccion/profesores/${id}/curso/${m.id}`}
                   style={{ padding:'6px 14px', fontSize:'12px', background:'transparent', color:'#3E5C76', border:'1px solid #3E5C76', borderRadius:'8px', textDecoration:'none' }}>
                   Ver cursos →
                 </Link>
