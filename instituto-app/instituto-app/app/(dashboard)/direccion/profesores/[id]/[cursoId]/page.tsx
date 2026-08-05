@@ -1,12 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import AsistenciaEditable from './AsistenciaEditable'
-import NotasEditables from './NotasEditables'
-
-const DIAS_MAP: Record<string, number> = { Do:0, Lu:1, Ma:2, Mi:3, Ju:4, Vi:5, Sa:6, Sá:6 }
-const MESES_ESP = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const DIAS_SEMANA = ['Lu','Ma','Mi','Ju','Vi','Sá','Do']
 
 export default async function CursoProfesorDireccionPage({ params }: { params: Promise<{ id: string; cursoId: string }> }) {
   const { id, cursoId } = await params
@@ -20,19 +14,19 @@ export default async function CursoProfesorDireccionPage({ params }: { params: P
   const { data: modulo } = await supabase.from('modulos').select('*').eq('id', cursoId).single()
   if (!modulo) redirect(`/direccion/profesores/${id}`)
 
-  const { data: feriados } = await supabase.from('feriados').select('fecha')
-  const feriadosSet = new Set(feriados?.map(f => f.fecha) || [])
-
+  const { data: estudiantes } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', cursoId).eq('retirado', false).order('apellido')
   const { data: sesiones } = await supabase.from('sesiones').select('id, fecha, numero_clase, cancelada').eq('modulo_id', cursoId).order('fecha')
-  const { data: estudiantes } = await supabase.from('estudiantes').select('id, apellido, nombre, codigo').eq('modulo_id', cursoId).eq('retirado', false).order('apellido')
+
+  const hoy = new Date().toISOString().split('T')[0]
+  const sesionesPasadas = sesiones?.filter(s => s.fecha <= hoy && !s.cancelada) || []
 
   const estIds = estudiantes?.map(e => e.id) || []
-  const sesIds = sesiones?.map(s => s.id) || []
+  const sesIds = sesionesPasadas.map(s => s.id)
 
-  let asistenciaData: {estudiante_id:string; sesion_id:string; asistio:boolean}[] = []
+  let asisData: {estudiante_id:string; sesion_id:string; asistio:boolean}[] = []
   if (estIds.length > 0 && sesIds.length > 0) {
     const { data } = await supabase.from('asistencias').select('estudiante_id, sesion_id, asistio').in('estudiante_id', estIds).in('sesion_id', sesIds)
-    asistenciaData = data || []
+    asisData = data || []
   }
 
   let notasData: {estudiante_id:string; p_oral:number|null; p_escrita:number|null; c_oral:number|null; c_escrita:number|null}[] = []
@@ -41,37 +35,13 @@ export default async function CursoProfesorDireccionPage({ params }: { params: P
     notasData = data || []
   }
 
-  // Calendario
-  const mesesCalendario: { label: string; diasGrid: { dia: number; tipo: string; fecha: string; sesionId?: string }[] }[] = []
-  const sesionesSet = new Map(sesiones?.map(s => [s.fecha, s.id]) || [])
+  const asisMap = new Map<string, Map<string, boolean>>()
+  asisData.forEach(a => {
+    if (!asisMap.has(a.estudiante_id)) asisMap.set(a.estudiante_id, new Map())
+    asisMap.get(a.estudiante_id)!.set(a.sesion_id, a.asistio)
+  })
 
-  if (modulo.fecha_inicio && modulo.fecha_fin) {
-    const inicio = new Date(modulo.fecha_inicio + 'T12:00:00')
-    const fin    = new Date(modulo.fecha_fin + 'T12:00:00')
-    const cur    = new Date(inicio.getFullYear(), inicio.getMonth(), 1)
-    const finMes = new Date(fin.getFullYear(), fin.getMonth() + 1, 0)
-    while (cur <= finMes) {
-      const year = cur.getFullYear(), month = cur.getMonth()
-      const diasEnMes = new Date(year, month + 1, 0).getDate()
-      const dias: { dia: number; tipo: string; fecha: string; sesionId?: string }[] = []
-      for (let d = 1; d <= diasEnMes; d++) {
-        const fecha = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-        let tipo = 'normal'
-        let sesionId: string | undefined
-        if (modulo.fecha_examen_nivel === fecha) tipo = 'examen-nivel'
-        else if (modulo.fecha_examen_modulo === fecha) tipo = 'examen-modulo'
-        else if (feriadosSet.has(fecha)) tipo = 'feriado'
-        else if (sesionesSet.has(fecha)) { tipo = 'clase'; sesionId = sesionesSet.get(fecha) }
-        dias.push({ dia: d, tipo, fecha, sesionId })
-      }
-      const offset = (new Date(year, month, 1).getDay() + 6) % 7
-      mesesCalendario.push({ label: `${MESES_ESP[month].toUpperCase()} ${year}`, diasGrid: [...Array(offset).fill({ dia:0, tipo:'blank', fecha:'' }), ...dias] })
-      cur.setMonth(cur.getMonth() + 1)
-    }
-  }
-
-  const hoy = new Date().toISOString().split('T')[0]
-  const sesionesPasadas = sesiones?.filter(s => s.fecha <= hoy && !s.cancelada) || []
+  const notasMap = new Map(notasData.map(n => [n.estudiante_id, n]))
 
   return (
     <div>
@@ -82,52 +52,90 @@ export default async function CursoProfesorDireccionPage({ params }: { params: P
       <div className="flex items-start justify-between mb-6 mt-3 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#3E5C76]">{modulo.nivel} — {modulo.modulo}</h1>
-          <p className="text-[#6B8294] text-sm">{modulo.grupo} · {modulo.modalidad} · {(modulo.dias as string[]).join('/')} · {modulo.horas_sesion}h/sesión</p>
-          <p className="text-[#6B8294] text-sm">Profesor: {prof?.nombre}</p>
+          <p className="text-[#6B8294] text-sm">{modulo.grupo} · Prof: {prof?.nombre}</p>
         </div>
         <Link href={`/direccion/modulos/${cursoId}/imprimir`} className="btn-secondary">🖨️ Imprimir reporte</Link>
       </div>
 
-      {/* Calendarios */}
-      <h2 className="font-semibold text-[#3E5C76] mb-3">Calendario</h2>
-      <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(mesesCalendario.length, 3)}, 1fr)`, gap:'10px', marginBottom:'24px' }}>
-        {mesesCalendario.map(mes => (
-          <div key={mes.label} style={{ border:'0.5px solid #E8DFCF', borderRadius:'8px', overflow:'hidden' }}>
-            <div style={{ background:'#3E5C76', color:'white', textAlign:'center', fontSize:'10px', fontWeight:700, padding:'4px' }}>{mes.label}</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:'1px', padding:'4px', background:'#f5f5f5' }}>
-              {DIAS_SEMANA.map(d => <div key={d} style={{ fontSize:'8px', textAlign:'center', color:'#666', padding:'1px' }}>{d}</div>)}
-              {mes.diasGrid.map((d, i) => {
-                if (d.tipo === 'blank' || d.dia === 0) return <div key={`b${i}`} />
-                const bg = d.tipo === 'clase' ? '#3E5C76' : d.tipo === 'feriado' ? '#BC4A3C' : d.tipo === 'examen-modulo' ? '#5B21B6' : d.tipo === 'examen-nivel' ? '#D97706' : 'white'
-                const col = ['clase','feriado','examen-modulo','examen-nivel'].includes(d.tipo) ? 'white' : '#9CA8B3'
-                const isClase = d.tipo === 'clase' && d.sesionId
+      {/* Asistencias */}
+      <h2 className="font-semibold text-[#3E5C76] mb-3">Asistencias</h2>
+      {sesionesPasadas.length === 0 ? (
+        <div className="card text-center py-6 mb-6"><p className="text-[#9CA8B3] text-sm">No hay sesiones pasadas.</p></div>
+      ) : (
+        <div className="card p-0 overflow-hidden mb-6" style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'11px' }}>
+            <thead>
+              <tr>
+                <th style={{ background:'#3E5C76', color:'white', padding:'6px 10px', textAlign:'left', minWidth:'140px' }}>Estudiante</th>
+                {sesionesPasadas.map(s => (
+                  <th key={s.id} style={{ background:'#3E5C76', color:'white', padding:'4px', textAlign:'center', minWidth:'32px', fontSize:'9px' }}>
+                    {new Date(s.fecha + 'T12:00:00').getDate()}/{new Date(s.fecha + 'T12:00:00').getMonth()+1}
+                  </th>
+                ))}
+                <th style={{ background:'#3E5C76', color:'white', padding:'6px', textAlign:'center', minWidth:'45px' }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {estudiantes?.map((e, i) => {
+                const presentes = sesionesPasadas.filter(s => asisMap.get(e.id)?.get(s.id) === true).length
                 return (
-                  <div key={i} title={d.tipo === 'clase' ? 'Clic para ver asistencia' : ''}
-                    style={{ fontSize:'9px', textAlign:'center', padding:'2px 1px', background:bg, color:col, borderRadius:'2px', fontWeight: d.tipo !== 'normal' ? 700 : 400, cursor: isClase ? 'pointer' : 'default', position:'relative' }}>
-                    {d.dia}
-                  </div>
+                  <tr key={e.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF3E8' }}>
+                    <td style={{ padding:'6px 10px', fontWeight:500, borderBottom:'0.5px solid #E8DFCF' }}>{e.apellido}, {e.nombre}</td>
+                    {sesionesPasadas.map(s => {
+                      const val = asisMap.get(e.id)?.get(s.id)
+                      return (
+                        <td key={s.id} style={{ padding:'3px', textAlign:'center', borderBottom:'0.5px solid #E8DFCF', background: val === true ? '#D1FAE5' : val === false ? '#FEE2E2' : 'white', color: val === true ? '#065F46' : val === false ? '#991B1B' : '#ccc', fontWeight:700, fontSize:'11px' }}>
+                          {val === true ? '✓' : val === false ? '✗' : ''}
+                        </td>
+                      )
+                    })}
+                    <td style={{ padding:'3px', textAlign:'center', fontWeight:700, borderBottom:'0.5px solid #E8DFCF' }}>{presentes}/{sesionesPasadas.length}</td>
+                  </tr>
                 )
               })}
-            </div>
-          </div>
-        ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Notas */}
+      <h2 className="font-semibold text-[#3E5C76] mb-3">Notas finales</h2>
+      <div className="card p-0 overflow-hidden">
+        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'11px' }}>
+          <thead>
+            <tr>
+              <th style={{ background:'#3E5C76', color:'white', padding:'6px 10px', textAlign:'left', minWidth:'140px' }}>Estudiante</th>
+              <th style={{ background:'#3E5C76', color:'white', padding:'6px', textAlign:'center' }}>P. Oral</th>
+              <th style={{ background:'#3E5C76', color:'white', padding:'6px', textAlign:'center' }}>P. Escrita</th>
+              <th style={{ background:'#3E5C76', color:'white', padding:'6px', textAlign:'center' }}>C. Oral</th>
+              <th style={{ background:'#3E5C76', color:'white', padding:'6px', textAlign:'center' }}>C. Escrita</th>
+              <th style={{ background:'#3E5C76', color:'white', padding:'6px', textAlign:'center' }}>Total</th>
+              <th style={{ background:'#3E5C76', color:'white', padding:'6px', textAlign:'center' }}>Resultado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {estudiantes?.map((e, i) => {
+              const n = notasMap.get(e.id)
+              const total = n ? (n.p_oral??0)+(n.p_escrita??0)+(n.c_oral??0)+(n.c_escrita??0) : null
+              const aprobado = total !== null && total >= 50
+              return (
+                <tr key={e.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF3E8' }}>
+                  <td style={{ padding:'6px 10px', fontWeight:500, borderBottom:'0.5px solid #E8DFCF' }}>{e.apellido}, {e.nombre}</td>
+                  <td style={{ padding:'6px', textAlign:'center', borderBottom:'0.5px solid #E8DFCF' }}>{n?.p_oral ?? '—'}</td>
+                  <td style={{ padding:'6px', textAlign:'center', borderBottom:'0.5px solid #E8DFCF' }}>{n?.p_escrita ?? '—'}</td>
+                  <td style={{ padding:'6px', textAlign:'center', borderBottom:'0.5px solid #E8DFCF' }}>{n?.c_oral ?? '—'}</td>
+                  <td style={{ padding:'6px', textAlign:'center', borderBottom:'0.5px solid #E8DFCF' }}>{n?.c_escrita ?? '—'}</td>
+                  <td style={{ padding:'6px', textAlign:'center', fontWeight:700, borderBottom:'0.5px solid #E8DFCF' }}>{total ?? '—'}/100</td>
+                  <td style={{ padding:'6px', textAlign:'center', fontWeight:700, borderBottom:'0.5px solid #E8DFCF', color: total === null ? '#9CA8B3' : aprobado ? '#065F46' : '#991B1B', background: total === null ? 'white' : aprobado ? '#D1FAE5' : '#FEE2E2' }}>
+                    {total === null ? '—' : aprobado ? 'Aprobado' : 'Reprobado'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
-
-      {/* Asistencias editables */}
-      <h2 className="font-semibold text-[#3E5C76] mb-3">Asistencias</h2>
-      <AsistenciaEditable
-        sesiones={sesionesPasadas}
-        estudiantes={estudiantes || []}
-        asistenciaInicial={asistenciaData}
-        moduloId={cursoId}
-      />
-
-      {/* Notas editables */}
-      <h2 className="font-semibold text-[#3E5C76] mb-3 mt-6">Notas finales</h2>
-      <NotasEditables
-        estudiantes={estudiantes || []}
-        notasIniciales={notasData}
-      />
+      <p className="text-xs text-[#9CA8B3] mt-2 text-center">Para editar asistencias o notas usa la sección correspondiente en el menú</p>
     </div>
   )
 }
