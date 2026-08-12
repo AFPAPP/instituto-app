@@ -11,28 +11,33 @@ export default async function DireccionPage() {
 
   // Métricas
   const { data: modulos } = await supabase.from('modulos').select('id, estado')
-  const { data: estudiantes } = await supabase.from('estudiantes').select('id, retirado')
   const { data: notifs } = await supabase.from('notificaciones').select('id').eq('leida', false)
   const { data: inscripciones } = await supabase.from('inscripciones').select('id, estado').eq('estado', 'Pendiente')
 
-  const enCurso   = modulos?.filter(m => m.estado === 'en_curso').length || 0
-  const activos   = estudiantes?.filter(e => !e.retirado).length || 0
-  const unread    = notifs?.length || 0
-  const pendInsc  = inscripciones?.length || 0
+  const enCurso = modulos?.filter(m => m.estado === 'en_curso').length || 0
+  const modulosEnCursoIds = modulos?.filter(m => m.estado === 'en_curso').map(m => m.id) || []
+
+  const { data: estudiantesActivos } = modulosEnCursoIds.length > 0
+    ? await supabase.from('estudiantes').select('id').in('modulo_id', modulosEnCursoIds).eq('retirado', false)
+    : { data: [] }
+
+  const activos  = estudiantesActivos?.length || 0
+  const unread   = notifs?.length || 0
+  const pendInsc = inscripciones?.length || 0
 
   const accesos = [
-    { href:'/direccion/modulos',       icon:'📚', label:'Módulos',        desc:'Crear y gestionar cursos',           color:'#3E5C76' },
-    { href:'/direccion/estudiantes',   icon:'👥', label:'Estudiantes',    desc:'Registrar y gestionar alumnos',      color:'#3E5C76' },
-    { href:'/direccion/profesores',    icon:'👨‍🏫', label:'Profesores',     desc:'Ver cursos y gestionar asistencias', color:'#3E5C76' },
-    { href:'/direccion/resumen',       icon:'💰', label:'Resumen',         desc:'Estado financiero por curso',        color:'#3E5C76' },
-    { href:'/direccion/bilan',         icon:'📊', label:'BILAN',           desc:'Registro financiero anual',          color:'#3E5C76' },
-    { href:'/direccion/reemplazos',    icon:'🔄', label:'Reemplazos',      desc:'Resumen mensual de reemplazos',      color:'#3E5C76' },
-    { href:'/direccion/feriados',      icon:'🗓️', label:'Feriados',        desc:'Gestionar días no laborables',       color:'#3E5C76' },
-    { href:'/direccion/estadisticas',  icon:'📈', label:'Estadísticas',    desc:'Resumen por nivel y módulo',         color:'#3E5C76' },
-    { href:'/direccion/notificaciones',icon:'🔔', label:'Notificaciones',  desc: unread > 0 ? `${unread} sin leer` : 'Sin notificaciones nuevas', color: unread > 0 ? '#BC4A3C' : '#3E5C76' },
-    { href:'/direccion/inscripciones', icon:'📋', label:'Inscripciones',   desc: pendInsc > 0 ? `${pendInsc} pendientes` : 'Fichas recibidas',    color: pendInsc > 0 ? '#D97706' : '#3E5C76' },
-    { href:'/direccion/reporte',       icon:'📄', label:'Reporte anual',   desc:'Cuestionario oficial AF',            color:'#3E5C76' },
-    { href:'/direccion/usuarios',      icon:'⚙️', label:'Usuarios',        desc:'Gestionar accesos y roles',          color:'#3E5C76' },
+    { href:'/direccion/modulos',        icon:'📚', label:'Módulos',        desc:'Crear y gestionar cursos',           color:'#3E5C76' },
+    { href:'/direccion/estudiantes',    icon:'👥', label:'Estudiantes',    desc:'Registrar y gestionar alumnos',      color:'#3E5C76' },
+    { href:'/direccion/profesores',     icon:'👨‍🏫', label:'Profesores',     desc:'Ver cursos y gestionar asistencias', color:'#3E5C76' },
+    { href:'/direccion/resumen',        icon:'💰', label:'Resumen',         desc:'Estado financiero por curso',        color:'#3E5C76' },
+    { href:'/direccion/bilan',          icon:'📊', label:'BILAN',           desc:'Registro financiero anual',          color:'#3E5C76' },
+    { href:'/direccion/reemplazos',     icon:'🔄', label:'Reemplazos',      desc:'Resumen mensual de reemplazos',      color:'#3E5C76' },
+    { href:'/direccion/feriados',       icon:'🗓️', label:'Feriados',        desc:'Gestionar días no laborables',       color:'#3E5C76' },
+    { href:'/direccion/estadisticas',   icon:'📈', label:'Estadísticas',    desc:'Resumen por nivel y módulo',         color:'#3E5C76' },
+    { href:'/direccion/notificaciones', icon:'🔔', label:'Notificaciones',  desc: unread > 0 ? `${unread} sin leer` : 'Sin notificaciones nuevas', color: unread > 0 ? '#BC4A3C' : '#3E5C76' },
+    { href:'/direccion/inscripciones',  icon:'📋', label:'Inscripciones',   desc: pendInsc > 0 ? `${pendInsc} pendientes` : 'Fichas recibidas',    color: pendInsc > 0 ? '#D97706' : '#3E5C76' },
+    { href:'/direccion/reporte',        icon:'📄', label:'Reporte anual',   desc:'Cuestionario oficial AF',            color:'#3E5C76' },
+    { href:'/direccion/usuarios',       icon:'⚙️', label:'Usuarios',        desc:'Gestionar accesos y roles',          color:'#3E5C76' },
   ]
 
   return (
@@ -50,7 +55,7 @@ export default async function DireccionPage() {
         </div>
         <div className="card text-center">
           <p className="text-3xl font-bold text-[#3E5C76]">{activos}</p>
-          <p className="text-xs text-[#9CA8B3] mt-1">Estudiantes activos</p>
+          <p className="text-xs text-[#9CA8B3] mt-1">Estudiantes en curso</p>
         </div>
         <div className="card text-center">
           <p className="text-3xl font-bold text-[#BC4A3C]">{unread}</p>
