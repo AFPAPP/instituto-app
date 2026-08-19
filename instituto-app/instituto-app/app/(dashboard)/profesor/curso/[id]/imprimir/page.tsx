@@ -66,7 +66,13 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
 
   const sesionesPasadas = sesiones?.filter(s => s.fecha <= hoy && !s.cancelada) || []
   const profNombre = (modulo.profesores as {nombre:string}|null)?.nombre || '—'
-
+  // Obtener nombres de profesores reemplazantes internos
+  const reemplazosInternosIds = sesiones?.filter(s => s.profesor_reemplazo_id).map(s => s.profesor_reemplazo_id!) || []
+  const nombresProfs: Record<string, string> = {}
+  if (reemplazosInternosIds.length > 0) {
+    const { data: profsData } = await supabase.from('profesores').select('id, nombre').in('id', reemplazosInternosIds)
+    profsData?.forEach(p => { nombresProfs[p.id] = p.nombre })
+  }
   return (
     <div style={{ fontFamily:'Arial, sans-serif', fontSize:'12px', color:'#1a1a1a', maxWidth:'1000px', margin:'0 auto', padding:'20px' }}>
 
@@ -231,7 +237,7 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
                   <td style={{ padding:'4px 6px', border:'0.5px solid #ccc', fontSize:'9px' }}>
                     {s.profesor_reemplazo_externo
                       ? `${s.profesor_reemplazo_externo} (externo)`
-                      : (s.prof_reemplazo as {nombre:string}|null)?.nombre || '—'}
+                      : nombresProfs[s.profesor_reemplazo_id || ''] || '—'}
                   </td>
                 </tr>
               ))}
