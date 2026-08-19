@@ -14,7 +14,9 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
   if (!modulo) redirect('/profesor')
 
   const { data: estudiantes } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', id).eq('retirado', false).order('apellido')
-  const { data: sesiones } = await supabase.from('sesiones').select('id, fecha, numero_clase, cancelada').eq('modulo_id', id).order('fecha')
+  const { data: sesiones } = await supabase.from('sesiones').select('id, fecha, numero_clase, cancelada, profesor_reemplazo_id, profesor_reemplazo_externo').eq('modulo_id', id).order('fecha')
+    const { data: profReemplazosData } = await supabase.from('profesores').select('id, nombre')
+  const profReemplazos = new Map(profReemplazosData?.map(p => [p.id, p.nombre]) || [])
   const { data: feriados } = await supabase.from('feriados').select('fecha')
   const feriadosSet = new Set(feriados?.map(f => f.fecha) || [])
 
@@ -205,7 +207,40 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
           <p style={{ fontSize:'9px', color:'#9CA8B3', marginTop:'4px', fontStyle:'italic' }}>Aprueba con mínimo 50/100 · Cada competencia sobre 25 puntos</p>
         </div>
       )}
-
+      {/* REEMPLAZOS */}
+      {sesiones?.some(s => s.profesor_reemplazo_id || s.profesor_reemplazo_externo) && (
+        <div style={{ marginTop:'16px' }}>
+          <div style={{ fontSize:'11px', fontWeight:700, color:'#3E5C76', textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1.5px solid #3E5C76', paddingBottom:'3px', marginBottom:'8px' }}>
+            Reemplazos durante el módulo
+          </div>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'10px' }}>
+            <thead>
+              <tr>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px 6px', textAlign:'left', fontSize:'9px', border:'0.5px solid #aaa', width:'80px' }}>Fecha</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px 6px', textAlign:'center', fontSize:'9px', border:'0.5px solid #aaa', width:'60px' }}>Clase</th>
+                <th style={{ background:'#3E5C76', color:'white', padding:'4px 6px', textAlign:'left', fontSize:'9px', border:'0.5px solid #aaa' }}>Profesor reemplazante</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sesiones?.filter(s => s.profesor_reemplazo_id || s.profesor_reemplazo_externo).map((s, i) => (
+                <tr key={s.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
+                  <td style={{ padding:'4px 6px', border:'0.5px solid #ccc', fontSize:'9px' }}>
+                    {new Date(s.fecha + 'T12:00:00').toLocaleDateString('es-EC', { day:'2-digit', month:'short' })}
+                  </td>
+                  <td style={{ padding:'4px 6px', border:'0.5px solid #ccc', fontSize:'9px', textAlign:'center' }}>
+                    Clase {s.numero_clase}
+                  </td>
+                  <td style={{ padding:'4px 6px', border:'0.5px solid #ccc', fontSize:'9px' }}>
+                    {s.profesor_reemplazo_externo
+                      ? `${s.profesor_reemplazo_externo} (externo)`
+                      : profReemplazos.get(s.profesor_reemplazo_id || '') || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <p style={{ textAlign:'center', fontSize:'9px', color:'#9CA8B3', marginTop:'20px' }}>
         Alliance Française Portoviejo · {new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'long', year:'numeric' })} · instituto-app-delta.vercel.app
       </p>
