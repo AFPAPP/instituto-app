@@ -14,7 +14,7 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
   if (!modulo) redirect('/profesor')
 
   const { data: estudiantes } = await supabase.from('estudiantes').select('id, apellido, nombre').eq('modulo_id', id).eq('retirado', false).order('apellido')
-  const { data: sesiones } = await supabase.from('sesiones').select('id, fecha, numero_clase, cancelada, profesor_reemplazo_id, profesor_reemplazo_externo').eq('modulo_id', id).order('fecha')
+const { data: sesiones } = await supabase.from('sesiones').select('id, fecha, numero_clase, cancelada, profesor_reemplazo_id, profesor_reemplazo_externo, prof_reemplazo:profesor_reemplazo_id(nombre)').eq('modulo_id', id).order('fecha')
     const { data: profReemplazosData } = await supabase.from('profesores').select('id, nombre')
   const profReemplazos = new Map(profReemplazosData?.map(p => [p.id, p.nombre]) || [])
   const { data: feriados } = await supabase.from('feriados').select('fecha')
@@ -233,7 +233,7 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
                   <td style={{ padding:'4px 6px', border:'0.5px solid #ccc', fontSize:'9px' }}>
                     {s.profesor_reemplazo_externo
                       ? `${s.profesor_reemplazo_externo} (externo)`
-                      : profReemplazos.get(s.profesor_reemplazo_id || '') || '—'}
+                     : (s.prof_reemplazo as {nombre:string}|null)?.nombre || '—'}
                   </td>
                 </tr>
               ))}
