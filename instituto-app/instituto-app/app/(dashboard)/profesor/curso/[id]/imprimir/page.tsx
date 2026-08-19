@@ -233,7 +233,7 @@ const { data: sesiones } = await supabase.from('sesiones').select('id, fecha, nu
                   <td style={{ padding:'4px 6px', border:'0.5px solid #ccc', fontSize:'9px' }}>
                     {s.profesor_reemplazo_externo
                       ? `${s.profesor_reemplazo_externo} (externo)`
-                     : (s.prof_reemplazo as {nombre:string}|null)?.nombre || '—'}
+                      : profReemplazosData?.find(p => p.id === s.profesor_reemplazo_id)?.nombre || '—'}
                   </td>
                 </tr>
               ))}
