@@ -6,8 +6,8 @@ const NIVELES = ['A1','A2','B1','B2','C1','C2']
 const MODALIDADES = ['Presencial','Virtual','Híbrido']
 const DIAS = ['Lu','Ma','Mi','Ju','Vi','Sá']
 const ESTADOS = ['por_iniciar','en_curso','finalizado','pausado']
-const ESTADO_LABEL: Record<string,string> = { por_iniciar:'Por iniciar', en_curso:'En curso', finalizado:'Finalizado', pausado:'Pausado' }
-const ESTADO_BADGE: Record<string,string> = { por_iniciar:'badge-warning', en_curso:'badge-success', finalizado:'badge-gray', pausado:'badge-danger' }
+const ESTADO_LABEL: Record<string,string> = { por_iniciar:'Por iniciar', en_curso:'En curso', finalizado:'Finalizado', pausado:'Pausado', por_finalizar:'⚠️ Por finalizar' }
+const ESTADO_BADGE: Record<string,string> = { por_iniciar:'badge-warning', en_curso:'badge-success', finalizado:'badge-gray', pausado:'badge-danger', por_finalizar:'badge-danger' }
 
 const SIGUIENTE: Record<string, { nivel: string; modulo: string }> = {
   'A1-Módulo 1': { nivel:'A1', modulo:'Módulo 2' },
@@ -27,7 +27,7 @@ const SIGUIENTE: Record<string, { nivel: string; modulo: string }> = {
   'C1-Módulo 3': { nivel:'C1', modulo:'Módulo 4' },
 }
 
-interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; tipo_grupo:string; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; profesores?:{nombre:string} }
+interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; tipo_grupo:string; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; profesores?:{nombre:string}; sesiones_restantes?:number }
 interface Profesor { id:string; nombre:string }
 
 const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', tipo_grupo:'adultos', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar' }
@@ -63,6 +63,16 @@ export default function ModulosPage() {
     await supabase.from('modulos').update({ estado: 'en_curso' }).eq('estado','por_iniciar').lte('fecha_inicio', hoy).not('fecha_inicio','is',null)
     const { data } = await supabase.from('modulos').select('*, profesores(nombre)').order('nivel').order('modulo')
     setModulos(((data as unknown) as Modulo[]) || [])
+    // Calcular sesiones restantes para módulos en curso
+    const hoy2 = new Date().toISOString().split('T')[0]
+    const modulosEnCurso2 = ((data as unknown) as Modulo[])?.filter(m => m.estado === 'en_curso') || []
+    if (modulosEnCurso2.length > 0) {
+      const ids = modulosEnCurso2.map(m => m.id)
+      const { data: sesFuturas } = await supabase.from('sesiones').select('modulo_id').in('modulo_id', ids).gte('fecha', hoy2).eq('cancelada', false)
+      const conteoPorModulo: Record<string, number> = {}
+      sesFuturas?.forEach(s => { conteoPorModulo[s.modulo_id] = (conteoPorModulo[s.modulo_id] || 0) + 1 })
+      setModulos(prev => prev.map(m => m.estado === 'en_curso' ? { ...m, sesiones_restantes: conteoPorModulo[m.id] ?? 0 } : m))
+    }
     const { data: profs } = await supabase.from('profesores').select('id, nombre').eq('rol', 'profesor').order('nombre')
     setProfesores(profs || [])
   }
@@ -189,7 +199,10 @@ export default function ModulosPage() {
             <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
               <span style={{ fontWeight:500, fontSize:'14px', color:'#1a1a1a' }}>{m.nivel} — {m.modulo}</span>
               <span style={{ fontSize:'12px', color:'#9CA8B3' }}>{m.grupo}</span>
-              <span className={ESTADO_BADGE[m.estado]}>{ESTADO_LABEL[m.estado]}</span>
+                         {m.estado === 'en_curso' && (m.sesiones_restantes ?? 99) <= 3
+                ? <span className="badge-danger">⚠️ Por finalizar ({m.sesiones_restantes} clases)</span>
+                : <span className={ESTADO_BADGE[m.estado]}>{ESTADO_LABEL[m.estado]}</span>
+              }
               <span style={{ fontSize:'11px', padding:'1px 7px', borderRadius:'4px', background: m.tipo_grupo === 'adolescentes' ? '#DBEAFE' : '#F0FDF4', color: m.tipo_grupo === 'adolescentes' ? '#1E40AF' : '#166534', fontWeight:500 }}>
                 {m.tipo_grupo === 'adolescentes' ? '👦 Adolescentes' : '🧑 Adultos'}
               </span>
