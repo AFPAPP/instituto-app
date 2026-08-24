@@ -27,7 +27,7 @@ export default async function DireccionPage() {
   const { data: me } = await supabase.from('profesores').select('rol, nombre').eq('user_id', user.id).single()
   if (me?.rol !== 'direccion') redirect('/profesor')
 
-  const { data: modulos } = await supabase.from('modulos').select('id, estado, nivel, modulo, grupo, fecha_fin')
+const { data: modulos } = await supabase.from('modulos').select('id, estado, nivel, modulo, grupo, fecha_fin, profesor_id')
   const { data: notifs } = await supabase.from('notificaciones').select('id').eq('leida', false)
   const { data: inscripciones } = await supabase.from('inscripciones').select('id').eq('estado', 'Pendiente')
 
@@ -58,6 +58,7 @@ export default async function DireccionPage() {
     const yaExiste = modulos?.some(otro =>
       otro.nivel === sig.nivel &&
       otro.modulo === sig.modulo &&
+      otro.profesor_id === m.profesor_id &&
       otro.estado !== 'finalizado' &&
       otro.id !== m.id
     )
