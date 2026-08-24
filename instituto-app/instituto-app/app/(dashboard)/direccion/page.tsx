@@ -52,9 +52,17 @@ export default async function DireccionPage() {
     if (!m.fecha_fin) return false
     if (m.fecha_fin < hace7diasStr) return false
     const key = `${m.nivel}-${m.modulo}`
-    return !!SIGUIENTE[key]
+    const sig = SIGUIENTE[key]
+    if (!sig) return false
+    // Verificar si ya existe un módulo siguiente activo
+    const yaExiste = modulos?.some(otro =>
+      otro.nivel === sig.nivel &&
+      otro.modulo === sig.modulo &&
+      otro.estado !== 'finalizado' &&
+      otro.id !== m.id
+    )
+    return !yaExiste
   }) || []
-
   const accesos = [
     { href:'/direccion/modulos',        icon:'📚', label:'Módulos',        desc:'Crear y gestionar cursos',           color:'#3E5C76' },
     { href:'/direccion/estudiantes',    icon:'👥', label:'Estudiantes',    desc:'Registrar y gestionar alumnos',      color:'#3E5C76' },
