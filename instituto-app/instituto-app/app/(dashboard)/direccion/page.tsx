@@ -2,6 +2,24 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
+const SIGUIENTE: Record<string, { nivel: string; modulo: string }> = {
+  'A1-Módulo 1': { nivel:'A1', modulo:'Módulo 2' },
+  'A1-Módulo 2': { nivel:'A2', modulo:'Módulo 1' },
+  'A2-Módulo 1': { nivel:'A2', modulo:'Módulo 2' },
+  'A2-Módulo 2': { nivel:'A2', modulo:'Módulo 3' },
+  'A2-Módulo 3': { nivel:'A2', modulo:'Módulo 4' },
+  'A2-Módulo 4': { nivel:'B1', modulo:'Módulo 1' },
+  'B1-Módulo 1': { nivel:'B1', modulo:'Módulo 2' },
+  'B1-Módulo 2': { nivel:'B1', modulo:'Módulo 3' },
+  'B1-Módulo 3': { nivel:'B2', modulo:'Módulo 1' },
+  'B2-Módulo 1': { nivel:'B2', modulo:'Módulo 2' },
+  'B2-Módulo 2': { nivel:'B2', modulo:'Módulo 3' },
+  'B2-Módulo 3': { nivel:'C1', modulo:'Módulo 1' },
+  'C1-Módulo 1': { nivel:'C1', modulo:'Módulo 2' },
+  'C1-Módulo 2': { nivel:'C1', modulo:'Módulo 3' },
+  'C1-Módulo 3': { nivel:'C1', modulo:'Módulo 4' },
+}
+
 export default async function DireccionPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -9,21 +27,33 @@ export default async function DireccionPage() {
   const { data: me } = await supabase.from('profesores').select('rol, nombre').eq('user_id', user.id).single()
   if (me?.rol !== 'direccion') redirect('/profesor')
 
-  // Métricas
-  const { data: modulos } = await supabase.from('modulos').select('id, estado')
+  const { data: modulos } = await supabase.from('modulos').select('id, estado, nivel, modulo, grupo, fecha_fin')
   const { data: notifs } = await supabase.from('notificaciones').select('id').eq('leida', false)
-  const { data: inscripciones } = await supabase.from('inscripciones').select('id, estado').eq('estado', 'Pendiente')
+  const { data: inscripciones } = await supabase.from('inscripciones').select('id').eq('estado', 'Pendiente')
 
   const enCurso = modulos?.filter(m => m.estado === 'en_curso').length || 0
   const modulosEnCursoIds = modulos?.filter(m => m.estado === 'en_curso').map(m => m.id) || []
-
   const { data: estudiantesActivos } = modulosEnCursoIds.length > 0
     ? await supabase.from('estudiantes').select('id').in('modulo_id', modulosEnCursoIds).eq('retirado', false)
     : { data: [] }
 
-  const activos  = estudiantesActivos?.length || 0
-  const unread   = notifs?.length || 0
-  const pendInsc = inscripciones?.length || 0
+  const activos   = estudiantesActivos?.length || 0
+  const unread    = notifs?.length || 0
+  const pendInsc  = inscripciones?.length || 0
+
+  // Módulos recién finalizados (últimos 7 días) con siguiente disponible
+  const hoy = new Date()
+  const hace7dias = new Date(hoy)
+  hace7dias.setDate(hoy.getDate() - 7)
+  const hace7diasStr = hace7dias.toISOString().split('T')[0]
+
+  const recienFinalizados = modulos?.filter(m => {
+    if (m.estado !== 'finalizado') return false
+    if (!m.fecha_fin) return false
+    if (m.fecha_fin < hace7diasStr) return false
+    const key = `${m.nivel}-${m.modulo}`
+    return !!SIGUIENTE[key]
+  }) || []
 
   const accesos = [
     { href:'/direccion/modulos',        icon:'📚', label:'Módulos',        desc:'Crear y gestionar cursos',           color:'#3E5C76' },
@@ -48,7 +78,7 @@ export default async function DireccionPage() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="card text-center">
           <p className="text-3xl font-bold text-[#3E5C76]">{enCurso}</p>
           <p className="text-xs text-[#9CA8B3] mt-1">Módulos en curso</p>
@@ -66,6 +96,36 @@ export default async function DireccionPage() {
           <p className="text-xs text-[#9CA8B3] mt-1">Inscripciones pendientes</p>
         </div>
       </div>
+
+      {/* Módulos recién finalizados — Acción requerida */}
+      {recienFinalizados.length > 0 && (
+        <div style={{ background:'#FEF3C7', border:'1px solid #FDE68A', borderRadius:'12px', padding:'16px', marginBottom:'24px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
+            <span style={{ fontSize:'20px' }}>🔔</span>
+            <div>
+              <p style={{ fontWeight:600, fontSize:'14px', color:'#92400E', margin:0 }}>Módulos recién finalizados — ¿Crear continuación?</p>
+              <p style={{ fontSize:'12px', color:'#B45309', margin:0 }}>Estos módulos finalizaron en los últimos 7 días y tienen un siguiente módulo disponible</p>
+            </div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+            {recienFinalizados.map(m => {
+              const sig = SIGUIENTE[`${m.nivel}-${m.modulo}`]
+              return (
+                <div key={m.id} style={{ background:'white', borderRadius:'8px', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap', border:'0.5px solid #FDE68A' }}>
+                  <div>
+                    <p style={{ fontWeight:500, fontSize:'13px', color:'#1a1a1a', margin:0 }}>{m.nivel} — {m.modulo} <span style={{ color:'#9CA8B3', fontWeight:400 }}>({m.grupo})</span></p>
+                    <p style={{ fontSize:'11px', color:'#9CA8B3', margin:0 }}>Finalizó el {m.fecha_fin} · Siguiente: {sig?.nivel} — {sig?.modulo}</p>
+                  </div>
+                  <Link href={`/direccion/modulos`}
+                    style={{ padding:'5px 12px', fontSize:'12px', background:'#D97706', color:'white', borderRadius:'8px', textDecoration:'none', whiteSpace:'nowrap', fontWeight:500 }}>
+                    ➡️ Crear siguiente
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Accesos */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
