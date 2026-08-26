@@ -156,7 +156,7 @@ export default function ModulosPage() {
     const key = `${m.nivel}-${m.modulo}`
     const sig = SIGUIENTE[key]
     if (!sig) { alert('Este es el último módulo de la secuencia.'); return }
-    setForm({
+     setForm({
       nivel: sig.nivel, modulo: sig.modulo,
       grupo: '', tipo_grupo: m.tipo_grupo || 'adultos',
       profesor_id: m.profesor_id, modalidad: m.modalidad,
