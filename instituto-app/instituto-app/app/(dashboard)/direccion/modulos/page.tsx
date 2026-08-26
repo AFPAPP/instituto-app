@@ -164,6 +164,7 @@ export default function ModulosPage() {
       fecha_inicio: '', fecha_fin: '',
       fecha_examen_modulo: '', fecha_examen_nivel: '',
       precio_mes: m.precio_mes, estado: 'por_iniciar',
+      horario: m.horario || '',
     })
     setEditId(null); setModuloOrigenId(m.id); setShowForm(true)
     setMsg(`✨ Continuación de ${m.nivel} — ${m.modulo}. Los estudiantes activos se copiarán automáticamente como recurrentes.`)
