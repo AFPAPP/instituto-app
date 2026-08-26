@@ -102,6 +102,7 @@ export default async function ImprimirModuloPage({ params }: { params: Promise<{
           <span><b>Días:</b> {(modulo.dias as string[]).join(' / ')}</span>
           <span><b>Horas/sesión:</b> {modulo.horas_sesion}h</span>
           <span><b>Precio/mes:</b> ${modulo.precio_mes}</span>
+          {modulo.horario && <span><b>Horario:</b> {modulo.horario}</span>}
         </div>
       </div>
 
