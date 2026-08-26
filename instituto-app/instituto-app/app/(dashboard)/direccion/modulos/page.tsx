@@ -27,10 +27,10 @@ const SIGUIENTE: Record<string, { nivel: string; modulo: string }> = {
   'C1-Módulo 3': { nivel:'C1', modulo:'Módulo 4' },
 }
 
-interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; tipo_grupo:string; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; profesores?:{nombre:string}; sesiones_restantes?:number }
+interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; tipo_grupo:string; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; horario:string|null; profesores?:{nombre:string}; sesiones_restantes?:number }
 interface Profesor { id:string; nombre:string }
 
-const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', tipo_grupo:'adultos', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar' }
+const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', tipo_grupo:'adultos', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar', horario:'' }
 
 type Filtro = 'todos' | 'en_curso' | 'por_iniciar' | 'finalizado' | 'pausado'
 
@@ -148,8 +148,7 @@ export default function ModulosPage() {
   }
 
   function editar(m: Modulo) {
-    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado })
-    setEditId(m.id); setModuloOrigenId(null); setShowForm(true)
+    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado, horario:m.horario||'' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -212,6 +211,7 @@ export default function ModulosPage() {
               <span>·</span><span>{m.modalidad}</span>
               <span>·</span><span>{(m.dias as string[]).join('/')}</span>
               <span>·</span><span>{m.horas_sesion}h/sesión</span>
+              {m.horario && <><span>·</span><span>🕐 {m.horario}</span></>}
               {m.fecha_inicio && <><span>·</span><span>{m.fecha_inicio} → {m.fecha_fin}</span></>}
               <span>·</span><span>${m.precio_mes}/mes</span>
             </div>
@@ -301,6 +301,8 @@ export default function ModulosPage() {
               </div></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Precio/mes ($)</label>
               <input type="number" className="input" min="0" value={form.precio_mes} onChange={e => setForm(f => ({ ...f, precio_mes: parseFloat(e.target.value)||0 }))} /></div>
+                        <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Horario</label>
+              <input className="input" placeholder="Ej: Lu 14h00-16h00 / Mi 08h00-10h00" value={form.horario} onChange={e => setForm(f => ({ ...f, horario: e.target.value }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Estado</label>
               <select className="input" value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}>
                 {ESTADOS.map(s => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
