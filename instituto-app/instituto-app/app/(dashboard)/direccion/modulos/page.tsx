@@ -149,9 +149,9 @@ export default function ModulosPage() {
 
   function editar(m: Modulo) {
     setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado, horario:m.horario||'' })
+    setEditId(m.id); setModuloOrigenId(null); setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-
   function crearSiguiente(m: Modulo) {
     const key = `${m.nivel}-${m.modulo}`
     const sig = SIGUIENTE[key]
