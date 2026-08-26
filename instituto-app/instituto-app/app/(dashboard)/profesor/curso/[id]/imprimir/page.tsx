@@ -95,6 +95,7 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
           <span><b>Fin:</b> {modulo.fecha_fin || '—'}</span>
           <span><b>Días:</b> {(modulo.dias as string[]).join(' / ')}</span>
           <span><b>Horas/sesión:</b> {modulo.horas_sesion}h</span>
+          {modulo.horario && <span><b>Horario:</b> {modulo.horario}</span>}
           <span><b>Total estudiantes:</b> {estudiantes?.length || 0}</span>
         </div>
       </div>
