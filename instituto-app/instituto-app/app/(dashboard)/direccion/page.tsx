@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import AsistenteTareas from './AsistenteTareas'
 
 const SIGUIENTE: Record<string, { nivel: string; modulo: string }> = {
   'A1-Módulo 1': { nivel:'A1', modulo:'Módulo 2' },
@@ -27,9 +28,12 @@ export default async function DireccionPage() {
   const { data: me } = await supabase.from('profesores').select('rol, nombre').eq('user_id', user.id).single()
   if (me?.rol !== 'direccion') redirect('/profesor')
 
-  const { data: modulos } = await supabase.from('modulos').select('id, estado, nivel, modulo, grupo, fecha_fin, profesor_id, tipo_grupo')
+  const { data: modulos } = await supabase.from('modulos').select('id, estado, nivel, modulo, grupo, fecha_fin, fecha_inicio, profesor_id, tipo_grupo')
   const { data: notifs } = await supabase.from('notificaciones').select('id').eq('leida', false)
   const { data: inscripciones } = await supabase.from('inscripciones').select('id').eq('estado', 'Pendiente')
+  const { data: tareas_descartadas } = await supabase.from('tareas_descartadas').select('tipo, referencia_id')
+
+  const descartadasSet = new Set(tareas_descartadas?.map(t => `${t.tipo}-${t.referencia_id}`) || [])
 
   const enCurso = modulos?.filter(m => m.estado === 'en_curso').length || 0
   const modulosEnCursoIds = modulos?.filter(m => m.estado === 'en_curso').map(m => m.id) || []
@@ -41,30 +45,115 @@ export default async function DireccionPage() {
   const unread    = notifs?.length || 0
   const pendInsc  = inscripciones?.length || 0
 
-  // Módulos recién finalizados (últimos 7 días) con siguiente disponible
   const hoy = new Date()
-  const hace7dias = new Date(hoy)
-  hace7dias.setDate(hoy.getDate() - 7)
-  const hace7diasStr = hace7dias.toISOString().split('T')[0]
+  const hace7diasStr = new Date(hoy.getTime() - 7*24*60*60*1000).toISOString().split('T')[0]
+  const hoyStr = hoy.toISOString().split('T')[0]
 
-  const recienFinalizados = modulos?.filter(m => {
-    if (m.estado !== 'finalizado') return false
-    if (!m.fecha_fin) return false
-    if (m.fecha_fin < hace7diasStr) return false
+  // Sesiones restantes por módulo en curso
+  const { data: sesFuturas } = modulosEnCursoIds.length > 0
+    ? await supabase.from('sesiones').select('modulo_id').in('modulo_id', modulosEnCursoIds).gte('fecha', hoyStr).eq('cancelada', false)
+    : { data: [] }
+  const sesRestantes: Record<string, number> = {}
+  sesFuturas?.forEach(s => { sesRestantes[s.modulo_id] = (sesRestantes[s.modulo_id] || 0) + 1 })
+
+  // Sesiones pasadas sin asistencias
+  const { data: sesPasadas } = await supabase.from('sesiones').select('id, modulo_id, fecha').lt('fecha', hoyStr).eq('cancelada', false).gte('fecha', hace7diasStr)
+  const sesPasadasIds = sesPasadas?.map(s => s.id) || []
+  const { data: asisRegistradas } = sesPasadasIds.length > 0
+    ? await supabase.from('asistencias').select('sesion_id').in('sesion_id', sesPasadasIds)
+    : { data: [] }
+  const conAsis = new Set(asisRegistradas?.map(a => a.sesion_id) || [])
+  const sesSinAsis = sesPasadas?.filter(s => !conAsis.has(s.id)) || []
+
+  // Módulos finalizados sin notas
+  const modFinIds = modulos?.filter(m => m.estado === 'finalizado').map(m => m.id) || []
+  const { data: estFinalizados } = modFinIds.length > 0
+    ? await supabase.from('estudiantes').select('id, modulo_id').in('modulo_id', modFinIds).eq('retirado', false)
+    : { data: [] }
+  const estFinIds = estFinalizados?.map(e => e.id) || []
+  const { data: notasReg } = estFinIds.length > 0
+    ? await supabase.from('notas').select('estudiante_id').in('estudiante_id', estFinIds)
+    : { data: [] }
+  const conNotas = new Set(notasReg?.map(n => n.estudiante_id) || [])
+  const modSinNotas = modFinIds.filter(mid => {
+    const ests = estFinalizados?.filter(e => e.modulo_id === mid) || []
+    return ests.length > 0 && ests.some(e => !conNotas.has(e.id))
+  })
+
+  // Módulos en curso sin estudiantes
+  const { data: estEnCurso } = modulosEnCursoIds.length > 0
+    ? await supabase.from('estudiantes').select('modulo_id').in('modulo_id', modulosEnCursoIds).eq('retirado', false)
+    : { data: [] }
+  const modConEst = new Set(estEnCurso?.map(e => e.modulo_id) || [])
+  const modSinEst = modulosEnCursoIds.filter(id => !modConEst.has(id))
+
+  // Construir tareas
+  const tareas: { id: string; tipo: string; prioridad: 'urgente'|'pendiente'|'info'; titulo: string; descripcion: string; href: string }[] = []
+
+  // 1. Módulos finalizados sin continuación
+  modulos?.filter(m => {
+    if (m.estado !== 'finalizado' || !m.fecha_fin || m.fecha_fin < hace7diasStr) return false
     const key = `${m.nivel}-${m.modulo}`
-    const sig = SIGUIENTE[key]
-    if (!sig) return false
-    // Verificar si ya existe un módulo siguiente activo
+    if (!SIGUIENTE[key]) return false
+    if (descartadasSet.has(`sin_continuacion-${m.id}`)) return false
     const yaExiste = modulos?.some(otro =>
-      otro.nivel === sig.nivel &&
-      otro.modulo === sig.modulo &&
+      otro.nivel === SIGUIENTE[key].nivel &&
+      otro.modulo === SIGUIENTE[key].modulo &&
       otro.profesor_id === m.profesor_id &&
       otro.tipo_grupo === m.tipo_grupo &&
       otro.estado !== 'finalizado' &&
       otro.id !== m.id
     )
     return !yaExiste
-  }) || []
+  }).forEach(m => {
+    tareas.push({ id: m.id, tipo:'sin_continuacion', prioridad:'urgente', titulo:`Crear continuación: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} finalizó el ${m.fecha_fin}. El siguiente es ${SIGUIENTE[`${m.nivel}-${m.modulo}`]?.nivel} — ${SIGUIENTE[`${m.nivel}-${m.modulo}`]?.modulo}.`, href:'/direccion/modulos' })
+  })
+
+  // 2. Módulos finalizados sin notas
+  modSinNotas.filter(id => !descartadasSet.has(`sin_notas-${id}`)).forEach(id => {
+    const m = modulos?.find(x => x.id === id)
+    if (m) tareas.push({ id, tipo:'sin_notas', prioridad:'urgente', titulo:`Notas pendientes: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} está finalizado pero tiene estudiantes sin notas.`, href:'/direccion/modulos' })
+  })
+
+  // 3. Módulos por iniciar con fecha pasada
+  modulos?.filter(m => m.estado === 'por_iniciar' && m.fecha_inicio && m.fecha_inicio < hoyStr && !descartadasSet.has(`por_iniciar_vencido-${m.id}`)).forEach(m => {
+    tareas.push({ id: m.id, tipo:'por_iniciar_vencido', prioridad:'urgente', titulo:`Módulo sin activar: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} debió iniciar el ${m.fecha_inicio} pero sigue como "Por iniciar".`, href:'/direccion/modulos' })
+  })
+
+  // 4. Módulos con 3 clases o menos
+  modulosEnCursoIds.filter(id => (sesRestantes[id] ?? 0) <= 3 && (sesRestantes[id] ?? 0) > 0 && !descartadasSet.has(`por_finalizar-${id}`)).forEach(id => {
+    const m = modulos?.find(x => x.id === id)
+    if (m) tareas.push({ id, tipo:'por_finalizar', prioridad:'pendiente', titulo:`Próximo a finalizar: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} tiene solo ${sesRestantes[id]} clase${sesRestantes[id] !== 1 ? 's' : ''} restante${sesRestantes[id] !== 1 ? 's' : ''}.`, href:'/direccion/modulos' })
+  })
+
+  // 5. Sesiones sin asistencias
+  const sesSinAsisFiltradas = sesSinAsis.filter(s => !descartadasSet.has(`sin_asistencia-${s.id}`))
+  if (sesSinAsisFiltradas.length > 0 && !descartadasSet.has('sin_asistencia-global')) {
+    tareas.push({ id:'global', tipo:'sin_asistencia', prioridad:'pendiente', titulo:`${sesSinAsisFiltradas.length} clase${sesSinAsisFiltradas.length !== 1 ? 's' : ''} sin asistencia marcada`, descripcion:`Hay clases de los últimos 7 días sin asistencias registradas.`, href:'/direccion/modulos' })
+  }
+
+  // 6. Inscripciones pendientes
+  if (pendInsc > 0 && !descartadasSet.has('inscripciones_pendientes-global')) {
+    tareas.push({ id:'global', tipo:'inscripciones_pendientes', prioridad:'pendiente', titulo:`${pendInsc} inscripción${pendInsc !== 1 ? 'es' : ''} pendiente${pendInsc !== 1 ? 's' : ''}`, descripcion:`Hay fichas de inscripción recibidas sin procesar.`, href:'/direccion/inscripciones' })
+  }
+
+  // 7. Módulos en curso sin estudiantes
+  modSinEst.filter(id => !descartadasSet.has(`sin_estudiantes-${id}`)).forEach(id => {
+    const m = modulos?.find(x => x.id === id)
+    if (m) tareas.push({ id, tipo:'sin_estudiantes', prioridad:'pendiente', titulo:`Sin estudiantes: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} está en curso pero no tiene estudiantes registrados.`, href:'/direccion/estudiantes' })
+  })
+
+  // 8. Módulos borradores sin fecha
+  modulos?.filter(m => m.estado === 'por_iniciar' && !m.fecha_inicio && !descartadasSet.has(`sin_fecha-${m.id}`)).forEach(m => {
+    tareas.push({ id: m.id, tipo:'sin_fecha', prioridad:'info', titulo:`Módulo sin fecha: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} no tiene fecha de inicio configurada.`, href:'/direccion/modulos' })
+  })
+
+  // 9. Recordatorio reporte anual (enero y febrero)
+  const mesActual = hoy.getMonth() + 1
+  if ((mesActual === 1 || mesActual === 2) && !descartadasSet.has(`reporte_anual-${hoy.getFullYear()}`)) {
+    tareas.push({ id: String(hoy.getFullYear()), tipo:'reporte_anual', prioridad:'info', titulo:'Reporte anual pendiente', descripcion:`Es temporada de llenar el cuestionario oficial de la Alliance Française para ${hoy.getFullYear() - 1}.`, href:'/direccion/reporte' })
+  }
+
   const accesos = [
     { href:'/direccion/modulos',        icon:'📚', label:'Módulos',        desc:'Crear y gestionar cursos',           color:'#3E5C76' },
     { href:'/direccion/estudiantes',    icon:'👥', label:'Estudiantes',    desc:'Registrar y gestionar alumnos',      color:'#3E5C76' },
@@ -107,38 +196,11 @@ export default async function DireccionPage() {
         </div>
       </div>
 
-      {/* Módulos recién finalizados — Acción requerida */}
-      {recienFinalizados.length > 0 && (
-        <div style={{ background:'#FEF3C7', border:'1px solid #FDE68A', borderRadius:'12px', padding:'16px', marginBottom:'24px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <span style={{ fontSize:'20px' }}>🔔</span>
-            <div>
-              <p style={{ fontWeight:600, fontSize:'14px', color:'#92400E', margin:0 }}>Módulos recién finalizados — ¿Crear continuación?</p>
-              <p style={{ fontSize:'12px', color:'#B45309', margin:0 }}>Estos módulos finalizaron en los últimos 7 días y tienen un siguiente módulo disponible</p>
-            </div>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-            {recienFinalizados.map(m => {
-              const sig = SIGUIENTE[`${m.nivel}-${m.modulo}`]
-              return (
-                <div key={m.id} style={{ background:'white', borderRadius:'8px', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap', border:'0.5px solid #FDE68A' }}>
-                  <div>
-                    <p style={{ fontWeight:500, fontSize:'13px', color:'#1a1a1a', margin:0 }}>{m.nivel} — {m.modulo} <span style={{ color:'#9CA8B3', fontWeight:400 }}>({m.grupo})</span></p>
-                    <p style={{ fontSize:'11px', color:'#9CA8B3', margin:0 }}>Finalizó el {m.fecha_fin} · Siguiente: {sig?.nivel} — {sig?.modulo}</p>
-                  </div>
-                  <Link href={`/direccion/modulos`}
-                    style={{ padding:'5px 12px', fontSize:'12px', background:'#D97706', color:'white', borderRadius:'8px', textDecoration:'none', whiteSpace:'nowrap', fontWeight:500 }}>
-                    ➡️ Crear siguiente
-                  </Link>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {/* Asistente de Tareas */}
+      <AsistenteTareas tareas={tareas} />
 
       {/* Accesos */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-6">
         {accesos.map(a => (
           <Link key={a.href} href={a.href} style={{ textDecoration:'none' }}>
             <div className="card hover:shadow-md transition-shadow cursor-pointer h-full"
