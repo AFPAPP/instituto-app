@@ -27,7 +27,10 @@ export default function NavBar({ nombre, rol }: NavBarProps) {
 
   const iniciales = nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
-  const linksProfesor = [{ href: '/profesor', label: 'Mis cursos' }]
+const linksProfesor = [
+  { href: '/profesor', label: 'Mis cursos' },
+  { href: '/profesor/refuerzos', label: 'Refuerzos' },
+]
   const linksDireccion = [
     { href: '/direccion',               label: 'Panel' },
     { href: '/direccion/modulos',       label: 'Módulos' },
@@ -40,6 +43,7 @@ export default function NavBar({ nombre, rol }: NavBarProps) {
      { href: '/direccion/inscripciones', label: 'Inscripciones' },
      { href: '/direccion/reporte',       label: 'Reporte' },
     { href: '/direccion/profesores',    label: 'Profesores' },
+    { href: '/direccion/refuerzos-individuales', label: 'Refuerzos' },
     { href: '/direccion/usuarios',      label: 'Usuarios' },
   ]
   const links = rol === 'direccion' ? linksDireccion : linksProfesor
