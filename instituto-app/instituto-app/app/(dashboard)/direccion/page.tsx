@@ -32,7 +32,7 @@ export default async function DireccionPage({ searchParams }: { searchParams: Pr
   if (me?.rol !== 'direccion') redirect('/profesor')
 
   const hoy = new Date()
-  const { data: modulos } = await supabase.from('modulos').select('id, estado, nivel, modulo, grupo, fecha_fin, fecha_inicio, profesor_id, tipo_grupo')
+  const { data: modulos } = await supabase.from('modulos').select('id, estado, nivel, modulo, grupo, fecha_fin, fecha_inicio, profesor_id, tipo_grupo, profesores(id)')
   const { data: notifs } = await supabase.from('notificaciones').select('id').eq('leida', false)
   const { data: inscripciones } = await supabase.from('inscripciones').select('id').eq('estado', 'Pendiente')
   const { data: tareas_descartadas } = await supabase.from('tareas_descartadas').select('tipo, referencia_id')
@@ -110,7 +110,7 @@ export default async function DireccionPage({ searchParams }: { searchParams: Pr
 
   modSinNotas.filter(id => !descartadasSet.has(`sin_notas-${id}`)).forEach(id => {
     const m = modulos?.find(x => x.id === id)
-    if (m) tareas.push({ id, tipo:'sin_notas', prioridad:'urgente', titulo:`Notas pendientes: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} está finalizado pero tiene estudiantes sin notas.`, href:'/direccion/modulos' })
+    if (m) tareas.push({ id, tipo:'sin_notas', prioridad:'urgente', titulo:`Notas pendientes: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} está finalizado pero tiene estudiantes sin notas.`, href:`/direccion/profesores/${m.profesor_id}/${m.id}` })
   })
 
   modulos?.filter(m => m.estado === 'por_iniciar' && m.fecha_inicio && m.fecha_inicio < hoyStr && !descartadasSet.has(`por_iniciar_vencido-${m.id}`)).forEach(m => {
