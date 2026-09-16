@@ -80,9 +80,9 @@ export default function EstudiantesPage() {
       .eq('retirado', false)
       .in('modulo_id', (await supabase.from('modulos').select('id').in('estado', ['en_curso', 'por_iniciar'])).data?.map(m => m.id) || [])
 
-    const nombresActivos = new Set(activos?.map(e => `${e.apellido.toLowerCase().trim()}-${e.nombre.toLowerCase().trim()}`) || [])
+    const nombresActivos = new Set(activos?.map(e => `${e.apellido.toLowerCase().trim().split(' ')[0]}-${e.nombre.toLowerCase().trim().split(' ')[0]}`) || [])
 
-    const lista = finalizados?.filter(e => !nombresActivos.has(`${e.apellido.toLowerCase().trim()}-${e.nombre.toLowerCase().trim()}`))
+    const lista = finalizados?.filter(e => !nombresActivos.has(`${e.apellido.toLowerCase().trim().split(' ')[0]}-${e.nombre.toLowerCase().trim().split(' ')[0]}`))
       .map((e: any) => ({
         id: e.id, apellido: e.apellido, nombre: e.nombre, codigo: e.codigo,
         categoria_edad: e.categoria_edad, tipo_inscripcion: e.tipo_inscripcion,
