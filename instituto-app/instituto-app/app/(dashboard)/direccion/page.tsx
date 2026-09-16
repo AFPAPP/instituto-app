@@ -105,7 +105,7 @@ export default async function DireccionPage({ searchParams }: { searchParams: Pr
     )
     return !yaExiste
   }).forEach(m => {
-    tareas.push({ id: m.id, tipo:'sin_continuacion', prioridad:'urgente', titulo:`Crear continuación: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} finalizó el ${m.fecha_fin}. El siguiente es ${SIGUIENTE[`${m.nivel}-${m.modulo}`]?.nivel} — ${SIGUIENTE[`${m.nivel}-${m.modulo}`]?.modulo}.`, href:'/direccion/modulos' })
+    tareas.push({ id: m.id, tipo:'sin_continuacion', prioridad:'urgente', titulo:`Crear continuación: ${m.nivel} — ${m.modulo}`, descripcion:`El módulo ${m.grupo} finalizó el ${m.fecha_fin}. El siguiente es ${SIGUIENTE[`${m.nivel}-${m.modulo}`]?.nivel} — ${SIGUIENTE[`${m.nivel}-${m.modulo}`]?.modulo}.`, href:`/direccion/modulos?siguiente=${m.id}` })
   })
 
   modSinNotas.filter(id => !descartadasSet.has(`sin_notas-${id}`)).forEach(id => {
