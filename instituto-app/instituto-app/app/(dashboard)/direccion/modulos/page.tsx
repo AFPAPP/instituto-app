@@ -217,10 +217,14 @@ export default function ModulosPage() {
     { key: 'pausado', label: 'Pausados' },
   ]
 
+  const siguienteId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('siguiente') : null
+
   function FilaModulo({ m, opaco = false }: { m: Modulo; opaco?: boolean }) {
     const tieneSiguiente = !!SIGUIENTE[`${m.nivel}-${m.modulo}`]
+    const esDestacado = m.id === siguienteId
     return (
-      <div className="p-3 hover:bg-[#FAF3E8] transition-colors" style={{ opacity: opaco ? 0.65 : 1 }}>
+      <div className="p-3 hover:bg-[#FAF3E8] transition-colors" style={{ opacity: opaco ? 0.65 : 1, background: esDestacado ? '#FEF9E7' : undefined, borderLeft: esDestacado ? '4px solid #D97706' : undefined }}>
+        {esDestacado && <p style={{ fontSize:'11px', fontWeight:600, color:'#92400E', marginBottom:'6px' }}>👆 Este módulo necesita continuación — haz clic en ➡️ Siguiente</p>}
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'12px' }}>
           <div style={{ flex:1 }}>
             <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
