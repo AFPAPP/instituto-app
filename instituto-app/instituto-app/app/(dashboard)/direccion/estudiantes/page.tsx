@@ -3,13 +3,10 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Modulo { id:string; nivel:string; modulo:string; grupo:string; estado:string; profesores?:{nombre:string} }
-interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; categoria_edad:string|null; tipo_inscripcion:string|null; descuento_pct:number; estado_pago:string; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string;estado:string;fecha_inicio:string|null;fecha_fin:string|null;horario:string|null} }
+interface Estudiante { id:string; modulo_id:string; apellido:string; nombre:string; codigo:string|null; categoria_edad:string|null; tipo_inscripcion:string|null; descuento_pct:number; retirado:boolean; fecha_retiro:string|null; motivo_retiro:string|null; modulos?:{nivel:string;modulo:string;grupo:string;estado:string;fecha_inicio:string|null;fecha_fin:string|null;horario:string|null} }
 interface EstudianteTodos { id:string; apellido:string; nombre:string; codigo:string|null; categoria_edad:string|null; tipo_inscripcion:string|null; nivel:string; modulo:string; grupo:string; estado:string; fecha_inicio:string|null; fecha_fin:string|null; horario:string|null }
 
-const ESTADOS_PAGO = ['pendiente','pagado','becado']
-const PAGO_BADGE: Record<string,string> = { pagado:'badge-success', pendiente:'badge-warning', becado:'badge-purple' }
-const PAGO_LABEL: Record<string,string> = { pagado:'Pagado', pendiente:'Pendiente', becado:'Becado' }
-const emptyEst = { modulo_id:'', apellido:'', nombre:'', codigo:'', categoria_edad:'adulto', tipo_inscripcion:'primera_vez', descuento_pct:0, estado_pago:'pendiente' }
+const emptyEst = { modulo_id:'', apellido:'', nombre:'', codigo:'', categoria_edad:'adulto', tipo_inscripcion:'primera_vez', descuento_pct:0 }
 
 type Pestaña = 'modulo' | 'todos' | 'no_continuaron'
 
@@ -49,11 +46,7 @@ export default function EstudiantesPage() {
   }, [pestaña])
 
   async function cargarTodos() {
-    const { data } = await supabase
-      .from('estudiantes')
-      .select('id, apellido, nombre, codigo, categoria_edad, tipo_inscripcion, modulo_id, modulos!inner(nivel, modulo, grupo, estado, fecha_inicio, fecha_fin, horario)')
-      .eq('retirado', false)
-      .order('apellido')
+    const { data } = await supabase.from('estudiantes').select('id, apellido, nombre, codigo, categoria_edad, tipo_inscripcion, modulo_id, modulos!inner(nivel, modulo, grupo, estado, fecha_inicio, fecha_fin, horario)').eq('retirado', false).order('apellido')
     const lista = data?.map((e: any) => ({
       id: e.id, apellido: e.apellido, nombre: e.nombre, codigo: e.codigo,
       categoria_edad: e.categoria_edad, tipo_inscripcion: e.tipo_inscripcion,
@@ -65,23 +58,9 @@ export default function EstudiantesPage() {
   }
 
   async function cargarNoContinuaron() {
-    // Estudiantes en módulos finalizados
-    const { data: finalizados } = await supabase
-      .from('estudiantes')
-      .select('id, apellido, nombre, codigo, categoria_edad, tipo_inscripcion, modulo_id, modulos!inner(nivel, modulo, grupo, estado, fecha_inicio, fecha_fin, horario)')
-      .eq('retirado', false)
-      .eq('modulos.estado', 'finalizado')
-      .order('apellido')
-
-    // Estudiantes en módulos activos
-    const { data: activos } = await supabase
-      .from('estudiantes')
-      .select('apellido, nombre')
-      .eq('retirado', false)
-      .in('modulo_id', (await supabase.from('modulos').select('id').in('estado', ['en_curso', 'por_iniciar'])).data?.map(m => m.id) || [])
-
+    const { data: finalizados } = await supabase.from('estudiantes').select('id, apellido, nombre, codigo, categoria_edad, tipo_inscripcion, modulo_id, modulos!inner(nivel, modulo, grupo, estado, fecha_inicio, fecha_fin, horario)').eq('retirado', false).eq('modulos.estado', 'finalizado').order('apellido')
+    const { data: activos } = await supabase.from('estudiantes').select('apellido, nombre').eq('retirado', false).in('modulo_id', (await supabase.from('modulos').select('id').in('estado', ['en_curso', 'por_iniciar'])).data?.map(m => m.id) || [])
     const nombresActivos = new Set(activos?.map(e => `${e.apellido.toLowerCase().trim().split(' ')[0]}-${e.nombre.toLowerCase().trim().split(' ')[0]}`) || [])
-
     const lista = finalizados?.filter(e => !nombresActivos.has(`${e.apellido.toLowerCase().trim().split(' ')[0]}-${e.nombre.toLowerCase().trim().split(' ')[0]}`))
       .map((e: any) => ({
         id: e.id, apellido: e.apellido, nombre: e.nombre, codigo: e.codigo,
@@ -107,11 +86,6 @@ export default function EstudiantesPage() {
     recargar()
   }
 
-  async function actualizarPago(id: string, estado_pago: string) {
-    await supabase.from('estudiantes').update({ estado_pago }).eq('id', id)
-    setEstudiantes(prev => prev.map(e => e.id === id ? { ...e, estado_pago } : e))
-  }
-
   async function eliminar(id: string) {
     if (!confirm('¿Eliminar este estudiante?')) return
     await supabase.from('estudiantes').delete().eq('id', id)
@@ -131,21 +105,18 @@ export default function EstudiantesPage() {
     recargar()
   }
 
+  function categoriaPrecio(e: Estudiante) {
+    if (e.descuento_pct === 100) return { label:'🎓 Becado', color:'#5B21B6', bg:'#EDE9FE' }
+    if (e.descuento_pct > 0) return { label:`🏷️ ${e.descuento_pct}% dto`, color:'#92400E', bg:'#FEF3C7' }
+    return { label:'💯 Precio completo', color:'#065F46', bg:'#D1FAE5' }
+  }
+
   const activos   = estudiantes.filter(e => !e.retirado)
   const retirados = estudiantes.filter(e => e.retirado)
   const modActual = modulos.find(m => m.id === moduloSel)
 
-  const todosFiltrados = todosEst.filter(e =>
-    busqueda === '' ||
-    e.apellido.toLowerCase().includes(busqueda.toLowerCase()) ||
-    e.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  )
-
-  const noContinuaronFiltrados = noContinuaron.filter(e =>
-    busqueda === '' ||
-    e.apellido.toLowerCase().includes(busqueda.toLowerCase()) ||
-    e.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  )
+  const todosFiltrados = todosEst.filter(e => busqueda === '' || e.apellido.toLowerCase().includes(busqueda.toLowerCase()) || e.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+  const noContinuaronFiltrados = noContinuaron.filter(e => busqueda === '' || e.apellido.toLowerCase().includes(busqueda.toLowerCase()) || e.nombre.toLowerCase().includes(busqueda.toLowerCase()))
 
   const ESTADO_COLOR: Record<string, string> = { en_curso:'#065F46', por_iniciar:'#92400E', finalizado:'#6B7280', pausado:'#991B1B' }
   const ESTADO_BG: Record<string, string> = { en_curso:'#D1FAE5', por_iniciar:'#FEF3C7', finalizado:'#F3F4F6', pausado:'#FEE2E2' }
@@ -158,13 +129,8 @@ export default function EstudiantesPage() {
         {pestaña === 'modulo' && <button onClick={() => { setShowForm(true); setEditId(null); setForm({ ...emptyEst, modulo_id: moduloSel }) }} className="btn-primary">+ Agregar</button>}
       </div>
 
-      {/* Pestañas */}
       <div style={{ display:'flex', gap:'6px', marginBottom:'16px', flexWrap:'wrap' }}>
-        {[
-          { key:'modulo', label:'Por módulo' },
-          { key:'todos', label:`Todos` },
-          { key:'no_continuaron', label:'No continuaron' },
-        ].map(p => (
+        {[{ key:'modulo', label:'Por módulo' }, { key:'todos', label:'Todos' }, { key:'no_continuaron', label:'No continuaron' }].map(p => (
           <button key={p.key} onClick={() => { setPestaña(p.key as Pestaña); setBusqueda('') }}
             style={{ padding:'6px 14px', borderRadius:'8px', fontSize:'13px', cursor:'pointer', border:'1px solid', fontWeight: pestaña === p.key ? 600 : 400, background: pestaña === p.key ? '#3E5C76' : 'white', color: pestaña === p.key ? '#FAF3E8' : '#6B8294', borderColor: pestaña === p.key ? '#3E5C76' : '#E8DFCF' }}>
             {p.label}
@@ -223,8 +189,16 @@ export default function EstudiantesPage() {
                     <option value="primera_vez">🆕 Primera vez en la AFP</option>
                     <option value="recurrente">🔄 Recurrente (ya estudió antes)</option>
                   </select></div>
-                <div><label className="block text-xs font-medium text-[#6B8294] mb-1">% Descuento</label>
-                  <input type="number" className="input" min="0" max="100" value={form.descuento_pct} onChange={e => setForm(f => ({ ...f, descuento_pct: Math.min(100, Math.max(0, parseInt(e.target.value)||0)) }))} /></div>
+                <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Descuento</label>
+                  <select className="input" value={form.descuento_pct} onChange={e => setForm(f => ({ ...f, descuento_pct: parseInt(e.target.value) }))}>
+                    <option value="0">💯 Precio completo</option>
+                    <option value="100">🎓 Becado (100%)</option>
+                    <option value="10">🏷️ 10% de descuento</option>
+                    <option value="20">🏷️ 20% de descuento</option>
+                    <option value="25">🏷️ 25% de descuento</option>
+                    <option value="30">🏷️ 30% de descuento</option>
+                    <option value="50">🏷️ 50% de descuento</option>
+                  </select></div>
               </div>
               <div className="flex gap-2 mt-4">
                 <button onClick={guardar} disabled={saving} className="btn-primary">{saving ? 'Guardando...' : 'Guardar'}</button>
@@ -235,56 +209,54 @@ export default function EstudiantesPage() {
 
           <div className="card p-0 overflow-hidden mb-4">
             <div className="divide-y divide-[#E8DFCF]">
-              {activos.map(e => (
-                <div key={e.id}>
-                  <div className="flex items-center justify-between p-3 hover:bg-[#FAF3E8] transition-colors gap-2 flex-wrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#3E5C76] text-[#FAF3E8] flex items-center justify-center text-xs font-semibold flex-shrink-0">{e.apellido[0]}{e.nombre[0]}</div>
-                      <div>
-                        <p className="font-medium text-sm text-[#1a1a1a]">{e.apellido}, {e.nombre}</p>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          {e.codigo && <span className="text-xs font-semibold text-[#3E5C76]">#{e.codigo}</span>}
-                          <span className="text-xs text-[#9CA8B3]">{e.descuento_pct > 0 ? `${e.descuento_pct}% descuento` : 'Precio completo'}</span>
-                          <span className={PAGO_BADGE[e.estado_pago]}>{PAGO_LABEL[e.estado_pago]}</span>
-                          <span style={{ fontSize:'11px', color: e.tipo_inscripcion === 'recurrente' ? '#5B21B6' : '#065F46', background: e.tipo_inscripcion === 'recurrente' ? '#EDE9FE' : '#D1FAE5', padding:'1px 6px', borderRadius:'4px' }}>
-                            {e.tipo_inscripcion === 'recurrente' ? '🔄 Recurrente' : '🆕 Primera vez'}
-                          </span>
+              {activos.map(e => {
+                const cat = categoriaPrecio(e)
+                return (
+                  <div key={e.id}>
+                    <div className="flex items-center justify-between p-3 hover:bg-[#FAF3E8] transition-colors gap-2 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#3E5C76] text-[#FAF3E8] flex items-center justify-center text-xs font-semibold flex-shrink-0">{e.apellido[0]}{e.nombre[0]}</div>
+                        <div>
+                          <p className="font-medium text-sm text-[#1a1a1a]">{e.apellido}, {e.nombre}</p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {e.codigo && <span className="text-xs font-semibold text-[#3E5C76]">#{e.codigo}</span>}
+                            <span style={{ fontSize:'11px', color: cat.color, background: cat.bg, padding:'1px 6px', borderRadius:'4px' }}>{cat.label}</span>
+                            <span style={{ fontSize:'11px', color: e.tipo_inscripcion === 'recurrente' ? '#5B21B6' : '#065F46', background: e.tipo_inscripcion === 'recurrente' ? '#EDE9FE' : '#D1FAE5', padding:'1px 6px', borderRadius:'4px' }}>
+                              {e.tipo_inscripcion === 'recurrente' ? '🔄 Recurrente' : '🆕 Primera vez'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <select className="text-xs border border-[#E8DFCF] rounded-lg px-2 py-1 bg-white text-[#1a1a1a]"
-                        value={e.estado_pago} onChange={ev => actualizarPago(e.id, ev.target.value)}>
-                        {ESTADOS_PAGO.map(ep => <option key={ep} value={ep}>{PAGO_LABEL[ep]}</option>)}
-                      </select>
-                      <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, codigo:e.codigo||'', categoria_edad:e.categoria_edad||'adulto', tipo_inscripcion:e.tipo_inscripcion||'primera_vez', descuento_pct:e.descuento_pct, estado_pago:e.estado_pago }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
-                      <button onClick={() => { setRetiroId(e.id); setRetiroFecha(''); setRetiroMotivo('') }}
-                        style={{ padding:'4px 10px', fontSize:'12px', background:'transparent', color:'#92400E', border:'1px solid #D97706', borderRadius:'8px', cursor:'pointer' }}>
-                        Retirar
-                      </button>
-                      <button onClick={() => eliminar(e.id)} className="btn-danger btn-sm">✕</button>
-                    </div>
-                  </div>
-                  {retiroId === e.id && (
-                    <div style={{ padding:'12px 16px', background:'#FFFBEB', borderTop:'0.5px solid #FDE68A' }}>
-                      <p style={{ fontSize:'12px', fontWeight:500, color:'#92400E', marginBottom:'8px' }}>⚠️ Registrar retiro de {e.nombre} {e.apellido}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                        <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha de retiro *</label>
-                          <input type="date" className="input" value={retiroFecha} onChange={ev => setRetiroFecha(ev.target.value)} /></div>
-                        <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Motivo (opcional)</label>
-                          <input type="text" className="input" placeholder="Ej: Motivos personales" value={retiroMotivo} onChange={ev => setRetiroMotivo(ev.target.value)} /></div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => confirmarRetiro(e.id)} disabled={saving}
-                          style={{ padding:'6px 14px', fontSize:'12px', background:'#D97706', color:'white', border:'none', borderRadius:'8px', cursor:'pointer' }}>
-                          {saving ? 'Guardando...' : 'Confirmar retiro'}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button onClick={() => { setEditId(e.id); setForm({ modulo_id:e.modulo_id, apellido:e.apellido, nombre:e.nombre, codigo:e.codigo||'', categoria_edad:e.categoria_edad||'adulto', tipo_inscripcion:e.tipo_inscripcion||'primera_vez', descuento_pct:e.descuento_pct }); setShowForm(true) }} className="btn-secondary btn-sm">Editar</button>
+                        <button onClick={() => { setRetiroId(e.id); setRetiroFecha(''); setRetiroMotivo('') }}
+                          style={{ padding:'4px 10px', fontSize:'12px', background:'transparent', color:'#92400E', border:'1px solid #D97706', borderRadius:'8px', cursor:'pointer' }}>
+                          Retirar
                         </button>
-                        <button onClick={() => setRetiroId(null)} className="btn-secondary btn-sm">Cancelar</button>
+                        <button onClick={() => eliminar(e.id)} className="btn-danger btn-sm">✕</button>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                    {retiroId === e.id && (
+                      <div style={{ padding:'12px 16px', background:'#FFFBEB', borderTop:'0.5px solid #FDE68A' }}>
+                        <p style={{ fontSize:'12px', fontWeight:500, color:'#92400E', marginBottom:'8px' }}>⚠️ Registrar retiro de {e.nombre} {e.apellido}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                          <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha de retiro *</label>
+                            <input type="date" className="input" value={retiroFecha} onChange={ev => setRetiroFecha(ev.target.value)} /></div>
+                          <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Motivo (opcional)</label>
+                            <input type="text" className="input" placeholder="Ej: Motivos personales" value={retiroMotivo} onChange={ev => setRetiroMotivo(ev.target.value)} /></div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => confirmarRetiro(e.id)} disabled={saving}
+                            style={{ padding:'6px 14px', fontSize:'12px', background:'#D97706', color:'white', border:'none', borderRadius:'8px', cursor:'pointer' }}>
+                            {saving ? 'Guardando...' : 'Confirmar retiro'}
+                          </button>
+                          <button onClick={() => setRetiroId(null)} className="btn-secondary btn-sm">Cancelar</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
               {activos.length === 0 && moduloSel && (
                 <div className="p-8 text-center text-[#9CA8B3] text-sm">No hay estudiantes activos en este módulo.</div>
               )}
@@ -361,9 +333,7 @@ export default function EstudiantesPage() {
                   </div>
                 </div>
               ))}
-              {todosFiltrados.length === 0 && (
-                <div className="p-8 text-center text-[#9CA8B3] text-sm">No se encontraron estudiantes.</div>
-              )}
+              {todosFiltrados.length === 0 && <div className="p-8 text-center text-[#9CA8B3] text-sm">No se encontraron estudiantes.</div>}
             </div>
           </div>
         </div>
@@ -394,13 +364,12 @@ export default function EstudiantesPage() {
                     <p style={{ fontSize:'12px', fontWeight:500, color:'#6B8294' }}>Último: {e.nivel} — {e.modulo}</p>
                     <p style={{ fontSize:'11px', color:'#9CA8B3' }}>{e.grupo}</p>
                     {e.fecha_fin && <p style={{ fontSize:'11px', color:'#9CA8B3' }}>Finalizó: {e.fecha_fin}</p>}
-                    {e.horario && <p style={{ fontSize:'11px', color:'#9CA8B3' }}>🕐 {e.horario}</p>}
                   </div>
                 </div>
               ))}
               {noContinuaronFiltrados.length === 0 && (
                 <div className="p-8 text-center text-[#9CA8B3] text-sm">
-                  {noContinuaron.length === 0 ? '✅ Todos los estudiantes han continuado al siguiente módulo.' : 'No se encontraron estudiantes.'}
+                  {noContinuaron.length === 0 ? '✅ Todos los estudiantes han continuado.' : 'No se encontraron estudiantes.'}
                 </div>
               )}
             </div>
