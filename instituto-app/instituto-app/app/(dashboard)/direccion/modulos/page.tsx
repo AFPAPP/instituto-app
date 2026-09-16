@@ -36,6 +36,7 @@ type Filtro = 'todos' | 'en_curso' | 'por_iniciar' | 'finalizado' | 'pausado'
 
 export default function ModulosPage() {
   const supabase = createClient()
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const [modulos, setModulos] = useState<Modulo[]>([])
   const [profesores, setProfesores] = useState<Profesor[]>([])
   const [form, setForm] = useState({ ...empty })
@@ -76,7 +77,33 @@ export default function ModulosPage() {
     const { data: profs } = await supabase.from('profesores').select('id, nombre').eq('rol', 'profesor').order('nombre')
     setProfesores(profs || [])
   }
-  useEffect(() => { load() }, [])
+    useEffect(() => {
+    load().then(() => {
+      const siguienteId = searchParams?.get('siguiente')
+      if (siguienteId) {
+        supabase.from('modulos').select('*').eq('id', siguienteId).single().then(({ data: m }) => {
+          if (m) {
+            const key = `${m.nivel}-${m.modulo}`
+            const sig = SIGUIENTE[key]
+            if (sig) {
+              setForm({
+                nivel: sig.nivel, modulo: sig.modulo,
+                grupo: '', tipo_grupo: m.tipo_grupo || 'adultos',
+                profesor_id: m.profesor_id, modalidad: m.modalidad,
+                dias: m.dias, horas_sesion: m.horas_sesion,
+                fecha_inicio: '', fecha_fin: '',
+                fecha_examen_modulo: '', fecha_examen_nivel: '',
+                precio_mes: m.precio_mes, estado: 'por_iniciar',
+                horario: m.horario || '',
+              })
+              setEditId(null); setModuloOrigenId(m.id); setShowForm(true)
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }
+          }
+        })
+      }
+    })
+  }, [])
 
   function toggleDia(d: string) {
     setForm(f => ({ ...f, dias: f.dias.includes(d) ? f.dias.filter(x => x !== d) : [...f.dias, d] }))
