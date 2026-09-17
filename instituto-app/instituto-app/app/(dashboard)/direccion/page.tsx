@@ -181,6 +181,8 @@ export default async function DireccionPage({ searchParams }: { searchParams: Pr
     { href:'/direccion/inscripciones',  icon:'📋', label:'Inscripciones',   desc: pendInsc > 0 ? `${pendInsc} pendientes` : 'Fichas recibidas',    color: pendInsc > 0 ? '#D97706' : '#3E5C76' },
     { href:'/direccion/reporte',        icon:'📄', label:'Reporte anual',   desc:'Cuestionario oficial AF',            color:'#3E5C76' },
     { href:'/direccion/usuarios',       icon:'⚙️', label:'Usuarios',        desc:'Gestionar accesos y roles',          color:'#3E5C76' },
+    { href:'/direccion/respaldo/mensual', icon:'📦', label:'Respaldo mensual', desc:'Documento completo del mes',     color:'#1B5E20' },
+    { href:'/direccion/respaldo/anual',   icon:'📅', label:'Respaldo anual',   desc:'Documento completo del año',     color:'#1B5E20' },
   ]
 
   return (
