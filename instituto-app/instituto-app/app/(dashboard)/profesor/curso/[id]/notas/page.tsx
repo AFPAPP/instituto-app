@@ -85,7 +85,7 @@ export default function NotasPage({ params }: { params: Promise<{ id: string }> 
           {estudiantes.map((e, i) => {
             const n = notas[e.id] || { p_oral: null, p_escrita: null, c_oral: null, c_escrita: null }
             const t = total(n)
-            const aprobado = t !== null && t >= 50
+    const aprobado = t !== null && t >= 50 && (n.p_oral ?? 0) >= 5 && (n.p_escrita ?? 0) >= 5 && (n.c_oral ?? 0) >= 5 && (n.c_escrita ?? 0) >= 5
             return (
               <div key={e.id} className={`grid grid-cols-6 gap-0 items-center p-2 ${i % 2 === 0 ? '' : 'bg-[#FAF3E8]'}`}>
                 <div className="col-span-2 flex items-center gap-2">
