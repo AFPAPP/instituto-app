@@ -73,7 +73,7 @@ export default async function ResumenPage() {
                     const nota  = nots.find(n => n.estudiante_id === e.id)
                     const total = nota && nota.p_oral !== null && nota.p_escrita !== null && nota.c_oral !== null && nota.c_escrita !== null
                       ? nota.p_oral + nota.p_escrita + nota.c_oral + nota.c_escrita : null
-                    const aprobado = total !== null && total >= 50
+                    const aprobado = total !== null && total >= 50 && (nota?.p_oral ?? 0) >= 5 && (nota?.p_escrita ?? 0) >= 5 && (nota?.c_oral ?? 0) >= 5 && (nota?.c_escrita ?? 0) >= 5
                     const totalEst = m.precio_mes * meses * (1 - e.descuento_pct / 100)
 
                     return (
