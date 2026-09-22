@@ -159,10 +159,14 @@ export default function ModulosPage() {
             .eq('modulo_id', moduloOrigenId)
             .eq('retirado', false)
           if (estsOrigen && estsOrigen.length > 0) {
-          const nuevosEsts = estsOrigen.map(e => ({
-              ...e,
+            const nuevosEsts = estsOrigen.map(e => ({
               modulo_id: nuevo.id,
+              apellido: e.apellido,
+              nombre: e.nombre,
+              codigo: e.codigo,
+              categoria_edad: e.categoria_edad,
               tipo_inscripcion: 'recurrente',
+              descuento_pct: e.descuento_pct,
               retirado: false,
             }))
             await supabase.from('estudiantes').insert(nuevosEsts)
