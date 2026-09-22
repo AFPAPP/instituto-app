@@ -192,7 +192,7 @@ export default async function ImprimirProfesorPage({ params }: { params: Promise
               {estudiantes?.map((est, i) => {
                 const nota = notasMap.get(est.id)
                 const total = nota ? (nota.p_oral??0)+(nota.p_escrita??0)+(nota.c_oral??0)+(nota.c_escrita??0) : null
-                const aprobado = total !== null && total >= 50
+                const aprobado = total !== null && total >= 50 && (nota?.p_oral ?? 0) >= 5 && (nota?.p_escrita ?? 0) >= 5 && (nota?.c_oral ?? 0) >= 5 && (nota?.c_escrita ?? 0) >= 5
                 return (
                   <tr key={est.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
                     <td style={{ padding:'3px 6px', fontSize:'9px', fontWeight:500, border:'0.5px solid #ccc' }}>{est.apellido}, {est.nombre}</td>
