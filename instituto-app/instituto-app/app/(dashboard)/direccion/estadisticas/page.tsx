@@ -33,7 +33,7 @@ export default async function EstadisticasPage() {
     const sesIds    = sess.filter(s => modIds.includes(s.modulo_id) && !s.cancelada).map(s => s.id)
     const notasNivel = nots.filter(n => estIds.includes(n.estudiante_id))
     const completas  = notasNivel.filter(n => n.p_oral !== null && n.p_escrita !== null && n.c_oral !== null && n.c_escrita !== null)
-    const aprobados  = completas.filter(n => (n.p_oral! + n.p_escrita! + n.c_oral! + n.c_escrita!) >= 50).length
+       const aprobados  = completas.filter(n => (n.p_oral! + n.p_escrita! + n.c_oral! + n.c_escrita!) >= 50 && n.p_oral! >= 5 && n.p_escrita! >= 5 && n.c_oral! >= 5 && n.c_escrita! >= 5).length
     const asisNivel  = asis.filter(a => estIds.includes(a.estudiante_id) && sesIds.includes(a.sesion_id))
     const pctAsist   = asisNivel.length > 0 ? Math.round((asisNivel.filter(a => a.asistio).length / asisNivel.length) * 100) : 0
     const pctAprob   = completas.length > 0 ? Math.round((aprobados / completas.length) * 100) : null
@@ -44,7 +44,7 @@ export default async function EstadisticasPage() {
   const totalRet  = ests.filter(e => e.retirado).length
   const enCurso   = mods.filter(m => m.estado === 'en_curso').length
   const notasComp = nots.filter(n => n.p_oral !== null && n.p_escrita !== null && n.c_oral !== null && n.c_escrita !== null)
-  const aprobTot  = notasComp.filter(n => (n.p_oral! + n.p_escrita! + n.c_oral! + n.c_escrita!) >= 50).length
+  const aprobTot  = notasComp.filter(n => (n.p_oral! + n.p_escrita! + n.c_oral! + n.c_escrita!) >= 50 && n.p_oral! >= 5 && n.p_escrita! >= 5 && n.c_oral! >= 5 && n.c_escrita! >= 5).length
   const pctAprob  = notasComp.length > 0 ? Math.round((aprobTot / notasComp.length) * 100) : 0
   const pctAsist  = asis.length > 0 ? Math.round((asis.filter(a => a.asistio).length / asis.length) * 100) : 0
 
