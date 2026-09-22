@@ -69,7 +69,7 @@ export default async function CursoProfesorDireccionPage({ params }: { params: P
   }
 
   const hoy = new Date().toISOString().split('T')[0]
-  const sesionesPasadas = sesiones?.filter(s => s.fecha <= hoy && !s.cancelada) || []
+   const sesionesPasadas = sesiones?.filter(s => !s.cancelada) || []
 
   return (
     <div>
