@@ -64,7 +64,7 @@ export default function NotasEditables({ estudiantes, notasIniciales }: {
             {estudiantes.map((e, i) => {
               const n = notas[e.id] || { p_oral:null, p_escrita:null, c_oral:null, c_escrita:null }
               const t = total(n)
-              const aprobado = t !== null && t >= 50
+    const aprobado = t !== null && t >= 50 && (n.p_oral ?? 0) >= 5 && (n.p_escrita ?? 0) >= 5 && (n.c_oral ?? 0) >= 5 && (n.c_escrita ?? 0) >= 5
               return (
                 <tr key={e.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF3E8' }}>
                   <td style={{ padding:'6px 10px', fontWeight:500, borderBottom:'0.5px solid #E8DFCF' }}>{e.apellido}, {e.nombre}</td>
