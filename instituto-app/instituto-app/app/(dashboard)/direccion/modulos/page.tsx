@@ -114,7 +114,10 @@ export default function ModulosPage() {
       setMsg('Para calcular necesitas: fecha de inicio, días de clase y horas por sesión'); return
     }
     let totalHoras: number
-    if (form.tipo_grupo === 'adolescentes') {
+    if (form.es_privado) {
+      totalHoras = form.horas_total_personalizado || 0
+      if (!totalHoras) { setMsg('Ingresa el total de horas del curso privado'); return }
+    } else if (form.tipo_grupo === 'adolescentes') {
       totalHoras = HORAS_ADOLESCENTES
     } else {
       const key = `${form.nivel}-${form.modulo}`
@@ -178,8 +181,7 @@ export default function ModulosPage() {
   }
 
   function editar(m: Modulo) {
-    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado, horario:m.horario||'' })
-    setEditId(m.id); setModuloOrigenId(null); setShowForm(true)
+    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'',precio_mes: m.precio_mes, estado:m.estado, horario:m.horario||'', es_privado:m.es_privado||false, horas_total_personalizado:m.horas_total_personalizado||0 })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   function crearSiguiente(m: Modulo) {
@@ -250,12 +252,12 @@ export default function ModulosPage() {
               {m.fecha_inicio && <><span>·</span><span>{m.fecha_inicio} → {m.fecha_fin}</span></>}
               <span>·</span><span>${m.precio_mes}/mes</span>
             </div>
-            <div style={{ display:'flex', gap:'8px', marginTop:'4px', flexWrap:'wrap' }}>
+           display:'flex', gap:'8px', marginTop:'4px', flexWrap:'wrap' }}>
               {m.fecha_examen_modulo && <span style={{ fontSize:'11px', background:'#EDE9FE', color:'#5B21B6', padding:'1px 7px', borderRadius:'4px' }}>📝 Examen módulo: {m.fecha_examen_modulo}</span>}
               {m.fecha_examen_nivel && <span style={{ fontSize:'11px', background:'#FEF3C7', color:'#92400E', padding:'1px 7px', borderRadius:'4px' }}>🎓 Examen nivel: {m.fecha_examen_nivel}</span>}
             </div>
           </div>
-          <div style={{ display:'flex', gap:'6px', flexShrink:0, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+         display:'flex', gap:'6px', flexShrink:0, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
             {m.estado === 'finalizado' && tieneSiguiente && (
               <button onClick={() => crearSiguiente(m)}
                 style={{ padding:'4px 10px', fontSize:'12px', background:'#D97706', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', whiteSpace:'nowrap' }}>
@@ -274,7 +276,7 @@ export default function ModulosPage() {
 
   return (
     <div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px' }}>
+     display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px' }}>
         <h1 className="text-2xl font-bold text-[#3E5C76]">Módulos</h1>
         <button onClick={() => { setShowForm(true); setEditId(null); setModuloOrigenId(null); setForm({ ...empty }) }} className="btn-primary">+ Nuevo módulo</button>
       </div>
@@ -285,11 +287,29 @@ export default function ModulosPage() {
             {editId ? 'Editar módulo' : moduloOrigenId ? `Siguiente módulo — ${form.nivel} ${form.modulo}` : 'Nuevo módulo'}
           </h2>
           {moduloOrigenId && (
-            <div style={{ background:'#FEF3C7', border:'0.5px solid #FDE68A', borderRadius:'8px', padding:'8px 12px', marginBottom:'12px', fontSize:'12px', color:'#92400E' }}>
+           background:'#FEF3C7', border:'0.5px solid #FDE68A', borderRadius:'8px', padding:'8px 12px', marginBottom:'12px', fontSize:'12px', color:'#92400E' }}>
               ✨ Los estudiantes activos del módulo anterior se copiarán automáticamente como recurrentes al guardar.
             </div>
           )}
-
+          {/* Toggle curso privado */}
+          <div style={{ marginBottom:'16px', padding:'12px', background: form.es_privado ? '#FEF3C7' : '#F5F0E8', borderRadius:'8px', border:`0.5px solid ${form.es_privado ? '#FDE68A' : '#E8DFCF'}` }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <p style={{ fontSize:'13px', fontWeight:600, color: form.es_privado ? '#92400E' : '#3E5C76', margin:0 }}>🔒 Curso privado / personalizado</p>
+                <p style={{ fontSize:'11px', color:'#9CA8B3', margin:'2px 0 0' }}>Sin restricción de horas — define el total libremente</p>
+              </div>
+              <button type="button" onClick={() => setForm(f => ({ ...f, es_privado: !f.es_privado }))}
+                style={{ padding:'6px 14px', fontSize:'12px', borderRadius:'8px', border:'none', cursor:'pointer', background: form.es_privado ? '#D97706' : '#E8DFCF', color: form.es_privado ? 'white' : '#6B8294', fontWeight:500 }}>
+                {form.es_privado ? '✓ Activo' : 'Activar'}
+              </button>
+            </div>
+            {form.es_privado && (
+              <div style={{ marginTop:'10px' }}>
+                <label className="block text-xs font-medium text-[#6B8294] mb-1">Total de horas del curso *</label>
+                <input type="number" className="input" min="1" value={form.horas_total_personalizado || ''} placeholder="Ej: 45" onChange={e => setForm(f => ({ ...f, horas_total_personalizado: parseInt(e.target.value)||0 }))} style={{ maxWidth:'150px' }} />
+              </div>
+            )}
+          </div>
           <div style={{ marginBottom:'16px', padding:'12px', background:'#F0F9FF', borderRadius:'8px', border:'0.5px solid #BAE6FD' }}>
             <p style={{ fontSize:'12px', fontWeight:500, color:'#0369A1', marginBottom:'8px' }}>Tipo de grupo</p>
             <div style={{ display:'flex', gap:'10px' }}>
