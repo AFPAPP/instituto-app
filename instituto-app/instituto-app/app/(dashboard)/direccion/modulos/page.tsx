@@ -64,7 +64,6 @@ export default function ModulosPage() {
     await supabase.from('modulos').update({ estado: 'en_curso' }).eq('estado','por_iniciar').lte('fecha_inicio', hoy).not('fecha_inicio','is',null)
     const { data } = await supabase.from('modulos').select('*, profesores(nombre)').order('nivel').order('modulo')
     setModulos(((data as unknown) as Modulo[]) || [])
-    // Calcular sesiones restantes para módulos en curso
     const hoy2 = new Date().toISOString().split('T')[0]
     const modulosEnCurso2 = ((data as unknown) as Modulo[])?.filter(m => m.estado === 'en_curso') || []
     if (modulosEnCurso2.length > 0) {
@@ -77,7 +76,8 @@ export default function ModulosPage() {
     const { data: profs } = await supabase.from('profesores').select('id, nombre').eq('rol', 'profesor').order('nombre')
     setProfesores(profs || [])
   }
-    useEffect(() => {
+
+  useEffect(() => {
     load().then(() => {
       const siguienteId = searchParams?.get('siguiente')
       if (siguienteId) {
@@ -94,7 +94,7 @@ export default function ModulosPage() {
                 fecha_inicio: '', fecha_fin: '',
                 fecha_examen_modulo: '', fecha_examen_nivel: '',
                 precio_mes: m.precio_mes, estado: 'por_iniciar',
-                horario: m.horario || '',
+                horario: m.horario || '', es_privado: false, horas_total_personalizado: 0,
               })
               setEditId(null); setModuloOrigenId(m.id); setShowForm(true)
               window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -155,7 +155,6 @@ export default function ModulosPage() {
       const { data: nuevo } = await supabase.from('modulos').insert(data).select().single()
       if (nuevo) {
         if (form.fecha_inicio && form.fecha_fin) await supabase.rpc('generar_sesiones', { p_modulo_id: nuevo.id })
-        // Copiar estudiantes del módulo origen si es continuación
         if (moduloOrigenId) {
           const { data: estsOrigen } = await supabase.from('estudiantes')
             .select('apellido, nombre, codigo, categoria_edad, tipo_inscripcion, descuento_pct')
@@ -181,14 +180,16 @@ export default function ModulosPage() {
   }
 
   function editar(m: Modulo) {
-    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'',precio_mes: m.precio_mes, estado:m.estado, horario:m.horario||'', es_privado:m.es_privado||false, horas_total_personalizado:m.horas_total_personalizado||0 })
+    setForm({ nivel:m.nivel, modulo:m.modulo, grupo:m.grupo, tipo_grupo:m.tipo_grupo||'adultos', profesor_id:m.profesor_id, modalidad:m.modalidad, dias:m.dias, horas_sesion:m.horas_sesion, fecha_inicio:m.fecha_inicio||'', fecha_fin:m.fecha_fin||'', fecha_examen_modulo:m.fecha_examen_modulo||'', fecha_examen_nivel:m.fecha_examen_nivel||'', precio_mes:m.precio_mes, estado:m.estado, horario:m.horario||'', es_privado:m.es_privado||false, horas_total_personalizado:m.horas_total_personalizado||0 })
+    setEditId(m.id); setModuloOrigenId(null); setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
   function crearSiguiente(m: Modulo) {
     const key = `${m.nivel}-${m.modulo}`
     const sig = SIGUIENTE[key]
     if (!sig) { alert('Este es el último módulo de la secuencia.'); return }
-     setForm({
+    setForm({
       nivel: sig.nivel, modulo: sig.modulo,
       grupo: '', tipo_grupo: m.tipo_grupo || 'adultos',
       profesor_id: m.profesor_id, modalidad: m.modalidad,
@@ -196,7 +197,7 @@ export default function ModulosPage() {
       fecha_inicio: '', fecha_fin: '',
       fecha_examen_modulo: '', fecha_examen_nivel: '',
       precio_mes: m.precio_mes, estado: 'por_iniciar',
-      horario: m.horario || '',
+      horario: m.horario || '', es_privado: false, horas_total_personalizado: 0,
     })
     setEditId(null); setModuloOrigenId(m.id); setShowForm(true)
     setMsg(`✨ Continuación de ${m.nivel} — ${m.modulo}. Los estudiantes activos se copiarán automáticamente como recurrentes.`)
@@ -235,29 +236,31 @@ export default function ModulosPage() {
             <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
               <span style={{ fontWeight:500, fontSize:'14px', color:'#1a1a1a' }}>{m.nivel} — {m.modulo}</span>
               <span style={{ fontSize:'12px', color:'#9CA8B3' }}>{m.grupo}</span>
-                         {m.estado === 'en_curso' && (m.sesiones_restantes ?? 99) <= 3
+              {m.estado === 'en_curso' && (m.sesiones_restantes ?? 99) <= 3
                 ? <span className="badge-danger">⚠️ Por finalizar ({m.sesiones_restantes} clases)</span>
                 : <span className={ESTADO_BADGE[m.estado]}>{ESTADO_LABEL[m.estado]}</span>
               }
               <span style={{ fontSize:'11px', padding:'1px 7px', borderRadius:'4px', background: m.tipo_grupo === 'adolescentes' ? '#DBEAFE' : '#F0FDF4', color: m.tipo_grupo === 'adolescentes' ? '#1E40AF' : '#166534', fontWeight:500 }}>
                 {m.tipo_grupo === 'adolescentes' ? '👦 Adolescentes' : '🧑 Adultos'}
               </span>
+              {m.es_privado && <span style={{ fontSize:'11px', padding:'1px 7px', borderRadius:'4px', background:'#FEF3C7', color:'#92400E', fontWeight:500 }}>🔒 Privado</span>}
             </div>
             <div style={{ display:'flex', gap:'6px', marginTop:'4px', fontSize:'12px', color:'#9CA8B3', flexWrap:'wrap', alignItems:'center' }}>
               <span>{(m.profesores as {nombre:string}|null)?.nombre}</span>
               <span>·</span><span>{m.modalidad}</span>
               <span>·</span><span>{(m.dias as string[]).join('/')}</span>
               <span>·</span><span>{m.horas_sesion}h/sesión</span>
+              {m.es_privado && m.horas_total_personalizado && <><span>·</span><span>{m.horas_total_personalizado}h total</span></>}
               {m.horario && <><span>·</span><span>🕐 {m.horario}</span></>}
               {m.fecha_inicio && <><span>·</span><span>{m.fecha_inicio} → {m.fecha_fin}</span></>}
               <span>·</span><span>${m.precio_mes}/mes</span>
             </div>
-           display:'flex', gap:'8px', marginTop:'4px', flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:'8px', marginTop:'4px', flexWrap:'wrap' }}>
               {m.fecha_examen_modulo && <span style={{ fontSize:'11px', background:'#EDE9FE', color:'#5B21B6', padding:'1px 7px', borderRadius:'4px' }}>📝 Examen módulo: {m.fecha_examen_modulo}</span>}
               {m.fecha_examen_nivel && <span style={{ fontSize:'11px', background:'#FEF3C7', color:'#92400E', padding:'1px 7px', borderRadius:'4px' }}>🎓 Examen nivel: {m.fecha_examen_nivel}</span>}
             </div>
           </div>
-         display:'flex', gap:'6px', flexShrink:0, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+          <div style={{ display:'flex', gap:'6px', flexShrink:0, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
             {m.estado === 'finalizado' && tieneSiguiente && (
               <button onClick={() => crearSiguiente(m)}
                 style={{ padding:'4px 10px', fontSize:'12px', background:'#D97706', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', whiteSpace:'nowrap' }}>
@@ -276,7 +279,7 @@ export default function ModulosPage() {
 
   return (
     <div>
-     display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px' }}>
         <h1 className="text-2xl font-bold text-[#3E5C76]">Módulos</h1>
         <button onClick={() => { setShowForm(true); setEditId(null); setModuloOrigenId(null); setForm({ ...empty }) }} className="btn-primary">+ Nuevo módulo</button>
       </div>
@@ -287,10 +290,11 @@ export default function ModulosPage() {
             {editId ? 'Editar módulo' : moduloOrigenId ? `Siguiente módulo — ${form.nivel} ${form.modulo}` : 'Nuevo módulo'}
           </h2>
           {moduloOrigenId && (
-           background:'#FEF3C7', border:'0.5px solid #FDE68A', borderRadius:'8px', padding:'8px 12px', marginBottom:'12px', fontSize:'12px', color:'#92400E' }}>
+            <div style={{ background:'#FEF3C7', border:'0.5px solid #FDE68A', borderRadius:'8px', padding:'8px 12px', marginBottom:'12px', fontSize:'12px', color:'#92400E' }}>
               ✨ Los estudiantes activos del módulo anterior se copiarán automáticamente como recurrentes al guardar.
             </div>
           )}
+
           {/* Toggle curso privado */}
           <div style={{ marginBottom:'16px', padding:'12px', background: form.es_privado ? '#FEF3C7' : '#F5F0E8', borderRadius:'8px', border:`0.5px solid ${form.es_privado ? '#FDE68A' : '#E8DFCF'}` }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -310,6 +314,7 @@ export default function ModulosPage() {
               </div>
             )}
           </div>
+
           <div style={{ marginBottom:'16px', padding:'12px', background:'#F0F9FF', borderRadius:'8px', border:'0.5px solid #BAE6FD' }}>
             <p style={{ fontSize:'12px', fontWeight:500, color:'#0369A1', marginBottom:'8px' }}>Tipo de grupo</p>
             <div style={{ display:'flex', gap:'10px' }}>
@@ -343,7 +348,7 @@ export default function ModulosPage() {
                 {MODALIDADES.map(m => <option key={m}>{m}</option>)}
               </select></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Horas/sesión</label>
-                <input type="number" className="input" min="0.5" max="10" step="0.5" value={form.horas_sesion} onChange={e => setForm(f => ({ ...f, horas_sesion: parseFloat(e.target.value)||2 }))} /></div>
+              <input type="number" className="input" min="0.5" max="10" step="0.01" value={form.horas_sesion} onChange={e => setForm(f => ({ ...f, horas_sesion: parseFloat(e.target.value)||2 }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha inicio</label>
               <input type="date" className="input" value={form.fecha_inicio} onChange={e => setForm(f => ({ ...f, fecha_inicio: e.target.value }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Fecha fin</label>
@@ -356,7 +361,7 @@ export default function ModulosPage() {
               </div></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Precio/mes ($)</label>
               <input type="number" className="input" min="0" value={form.precio_mes} onChange={e => setForm(f => ({ ...f, precio_mes: parseFloat(e.target.value)||0 }))} /></div>
-                        <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Horario</label>
+            <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Horario</label>
               <input className="input" placeholder="Ej: Lu 14h00-16h00 / Mi 08h00-10h00" value={form.horario} onChange={e => setForm(f => ({ ...f, horario: e.target.value }))} /></div>
             <div><label className="block text-xs font-medium text-[#6B8294] mb-1">Estado</label>
               <select className="input" value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}>
