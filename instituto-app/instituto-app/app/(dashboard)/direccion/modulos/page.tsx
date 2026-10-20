@@ -27,10 +27,10 @@ const SIGUIENTE: Record<string, { nivel: string; modulo: string }> = {
   'C1-Módulo 3': { nivel:'C1', modulo:'Módulo 4' },
 }
 
-interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; tipo_grupo:string; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; horario:string|null; profesores?:{nombre:string}; sesiones_restantes?:number }
+interface Modulo { id:string; nivel:string; modulo:string; grupo:string; profesor_id:string; modalidad:string; dias:string[]; horas_sesion:number; fecha_inicio:string|null; fecha_fin:string|null; precio_mes:number; estado:string; tipo_grupo:string; fecha_examen_modulo:string|null; fecha_examen_nivel:string|null; horario:string|null; es_privado:boolean; horas_total_personalizado:number|null; profesores?:{nombre:string}; sesiones_restantes?:number }
 interface Profesor { id:string; nombre:string }
 
-const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', tipo_grupo:'adultos', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar', horario:'' }
+const empty = { nivel:'A1', modulo:'Módulo 1', grupo:'', tipo_grupo:'adultos', profesor_id:'', modalidad:'Presencial', dias:[] as string[], horas_sesion:2, fecha_inicio:'', fecha_fin:'', fecha_examen_modulo:'', fecha_examen_nivel:'', precio_mes:0, estado:'por_iniciar', horario:'', es_privado:false, horas_total_personalizado:0 }
 
 type Filtro = 'todos' | 'en_curso' | 'por_iniciar' | 'finalizado' | 'pausado'
 
