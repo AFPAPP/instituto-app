@@ -30,6 +30,7 @@ export default function NavBar({ nombre, rol }: NavBarProps) {
 const linksProfesor = [
   { href: '/profesor', label: 'Mis cursos' },
   { href: '/profesor/refuerzos', label: 'Refuerzos' },
+  { href: '/profesor/reemplazos', label: 'Reemplazos' },
 ]
   const linksDireccion = [
     { href: '/direccion',               label: 'Panel' },
